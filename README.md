@@ -1,2 +1,1 @@
-# sfc
-GM scripts for SFC
+SFC Advantage scripts
