@@ -32,6 +32,8 @@
 //
 // VERSION HISTORY
 //
+// 0.11 - Add to git and make local development stub
+//
 // 0.7 - Just bring current
 //
 // 0.5 - Worked on module enable/disable
@@ -259,7 +261,7 @@ jQuery( document ).ready(function( $ ) {
     if (moduleEnabled)
         displayEnabled='enabled';
     var myVersion = GM_info.script.version;
-    console.log ('AllPlanets (to GIT) ver', myVersion, displayEnabled);
+    console.log ('AllPlanets ver', myVersion, displayEnabled);
 
     /***
      * When the All Planets overview is displayed, if we got here from a click on our toolbar, switch to the appropriate tab.
@@ -268,13 +270,15 @@ jQuery( document ).ready(function( $ ) {
      * subsequent page load. The onClick handler is injected into the page so is not userscript, and has no access to GM_setValue.
      ***/
     if ( $('#content.overview.index').length ) {
-        var showAllTasks = getCookie('alltasks');
+
+        //var showAllTasks = getCookie('alltasks'); //TODO: superfluous, get rid of it.
+        //document.cookie = "alltasks=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
+
         var tabName = getCookie('allItemsTab');
-        document.cookie = "alltasks=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
         document.cookie = "allItemsTab=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
 
         if (tabName.length) {
-            disable_ajax_links();;
+            disable_ajax_links();
             new Ajax.Request('/overview/'+ tabName + '?current_planet=34287', {asynchronous:true, evalScripts:true});
         }
     }
