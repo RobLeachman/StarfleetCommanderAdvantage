@@ -252,6 +252,6 @@ Stores.prototype = {
 
 
 jQuery(document).ready(function ($) {
-    var logger = new Logger();
-    logger.log('d','Logger version ' + GM_info.script.version);
+    //var logger = new Logger();
+    //logger.log('d','Logger version ' + GM_info.script.version);
 });

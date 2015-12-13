@@ -1154,6 +1154,7 @@ Resolve.prototype = {
  *********           */
         }
 
+        console.log("DEBUGGER saveTimedEvent");
         var evtCount = this.saveTimedEvent($, myTime, myStart, myEnd, callback, missionType, missionDest, missionOrigin, missionInfo);
         return evtCount;
     },
@@ -1177,7 +1178,7 @@ Resolve.prototype = {
             argsDump += k+'='+arguments[k]+' ';
         }
         var logger = new Logger();
-        logger.log('d','event args='+arguments.length+' '+argsDump);
+        //logger.log('d','event args='+arguments.length+' '+argsDump);
         var stores = new Stores();
         return stores.appendEvent($, time, start, end, callback, type, dest, origin, info);
     },

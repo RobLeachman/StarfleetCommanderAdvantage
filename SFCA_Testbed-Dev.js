@@ -315,7 +315,7 @@ function addMyCSS_testbed() {
     myCSS += "}";
 
     myCSS += "#header .sub_nav .nav_item {";
-    myCSS += "padding: 10px 6px !important;"
+    myCSS += "padding: 10px 6px !important;";
     myCSS += "}";
     //myCSS += ".nav_item.image {";
     //myCSS += "padding: 0px 0px !important;"
@@ -335,7 +335,7 @@ function addMyCSS_testbed() {
     myCSS += '}';
 
     myCSS += '#content #overview_table .sufficient,';
-    myCSS += '#header .resources .row.sufficient {;'
+    myCSS += '#header .resources .row.sufficient {;';
     myCSS += '    color: green;';
     myCSS += '}';
 
@@ -563,6 +563,7 @@ function doResearchReport($) {
             } else {
 
                 var p = stripCoordsFromPlanetRow($, $this);
+                console.log("DEBUG processing ",p);
 
                 var ore = $this.children('td').first().next();
                 var crystal = $this.children('td').first().next().next();
@@ -575,41 +576,45 @@ function doResearchReport($) {
                 //console.log("DEBUG O/C/H", availableOre, availableCrystal, availableHydro);
 
                 var upgrade = localStorage[uni + '-' + 'researchUpgrade_' + p]; // = loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
-                var upgradeOre = upgrade.split('/')[0];
-                var upgradeCrystal = upgrade.split('/')[1];
-                var upgradeHydro = upgrade.split('/')[2];
-                console.log("upgrade", upgradeOre, upgradeCrystal, upgradeHydro);
+                if (typeof upgrade === 'string') {
+                    var upgradeOre = upgrade.split('/')[0];
+                    var upgradeCrystal = upgrade.split('/')[1];
+                    var upgradeHydro = upgrade.split('/')[2];
+                    console.log("upgrade", upgradeOre, upgradeCrystal, upgradeHydro);
 
-                //var netOre = availableOre - upgradeOre;
-                //ore.html(format( availableOre - upgradeOre ,'.',0));
-                ore.html(Math.abs(availableOre - upgradeOre).toLocaleString());
-                crystal.html(Math.abs(availableCrystal - upgradeCrystal).toLocaleString());
-                hydro.html(Math.abs(availableHydro - upgradeHydro).toLocaleString());
+                    //var netOre = availableOre - upgradeOre;
+                    //ore.html(format( availableOre - upgradeOre ,'.',0));
+                    ore.html(Math.abs(availableOre - upgradeOre).toLocaleString());
+                    crystal.html(Math.abs(availableCrystal - upgradeCrystal).toLocaleString());
+                    hydro.html(Math.abs(availableHydro - upgradeHydro).toLocaleString());
 
-                //<td class="alt ore full">298,236</td>
-                //<td class="alt ore almost_full">298,236</td>
-                //<td class="alt ore sufficient">639,572</td>
-                //<td class="crystal> full">150,071</td>
-                //<td class="crystal> sufficient">150,071</td>
-                if ((availableOre - upgradeOre) < 0) {
-                    console.log("INSUFFICIENT available", availableOre, "upgrade", upgradeOre)
-                    ore.attr('class', 'alt ore full');
-                } else {
-                    console.log("Plenty of ore");
-                    ore.attr('class', 'alt ore');
-                }
-                if ((availableCrystal - upgradeCrystal) < 0) {
-                    crystal.attr('class', 'crystal> full');
-                } else {
-                    crystal.attr('class', 'crystal');
-                }
-                if ((availableHydro - upgradeHydro) < 0) {
-                    hydro.attr('class', 'alt hydrogen full');
-                } else {
-                    hydro.attr('class', 'alt hydrogen');
-                    console.log("Plenty! of hydrogen");
-                    console.log("DEBUG I GIVE UP");
+                    //<td class="alt ore full">298,236</td>
+                    //<td class="alt ore almost_full">298,236</td>
+                    //<td class="alt ore sufficient">639,572</td>
+                    //<td class="crystal> full">150,071</td>
+                    //<td class="crystal> sufficient">150,071</td>
+                    if ((availableOre - upgradeOre) < 0) {
+                        console.log("INSUFFICIENT available", availableOre, "upgrade", upgradeOre);
+                        ore.attr('class', 'alt ore full');
+                    } else {
+                        console.log("Plenty of ore");
+                        ore.attr('class', 'alt ore');
+                    }
+                    if ((availableCrystal - upgradeCrystal) < 0) {
+                        crystal.attr('class', 'crystal> full');
+                    } else {
+                        crystal.attr('class', 'crystal');
+                    }
+                    if ((availableHydro - upgradeHydro) < 0) {
+                        hydro.attr('class', 'alt hydrogen full');
+                    } else {
+                        hydro.attr('class', 'alt hydrogen');
+                        console.log("Plenty! of hydrogen");
+                        console.log("DEBUG I GIVE UP");
 
+                    }
+                } else {
+                    console.log("DEBUG no upgrade data");
                 }
 
 
@@ -666,17 +671,23 @@ function doResearchReport($) {
     });
 
 
-    // Sort by research level
+    // Sort by research lab level
     var $table = $('#overview_table > table');
 
     var rows = $table.find('tr').get();
 
     rows.sort(function (a, b) {
-        var keyA = $(a).attr('lab_level');
-        var keyB = $(b).attr('lab_level');
+        var keyA = parseInt( $(a).attr('lab_level'), 10);
+        var keyB = parseInt( $(b).attr('lab_level'), 10);
+        if (isNaN(keyA)) {
+            keyA = 0;
+        }
+        if (isNaN(keyB)) {
+            keyB = 0;
+        }
 
-        if (parseInt(keyA, 10) < parseInt(keyB, 10)) return 1;
-        if (parseInt(keyA, 10) > parseInt(keyB, 10)) return -1;
+        if (keyA < keyB) return 1;
+        if (keyA > keyB) return -1;
         return 0;
     });
     $.each(rows, function (index, row) {
