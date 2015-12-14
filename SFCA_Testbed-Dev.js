@@ -1169,6 +1169,18 @@ Shipwright.prototype = {
     }
 };
 
+function doPurgeEverything() {
+    console.log("Go for it");
+    // select all messages, as they do, then delete...
+    check_all_message_pages(21); // no idea what the message count here does
+    delete_clicked();
+
+    // purge my log messages
+    var universe = window.location.href.split('.')[0].split('/')[2];
+    var logger = new Logger(universe);
+    logger.purge();
+}
+
 
 /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
  *
@@ -1215,6 +1227,24 @@ jQuery(document).ready(function ($) {
         console.log("Tech");
         //goalie.determineRecommendation($);
     }
+
+    /**
+     * Provide a single button to clear messages and logs...
+     */
+    if ($('.messages.index').length) {
+        add = document.createElement('span');
+        add.setAttribute('class', 'enabled');
+        add.innerHTML = '<a id="purgeAll">' +
+            '<span class="button">Purge All</span>' +
+            '</a>';
+        //$(add).insertBefore('.section_content');
+        $('.section_content').prepend(add);
+
+        $('#purgeAll').click(function () {
+            doPurgeEverything($);
+        });
+    }
+
 
     /**
      * Provide automation to the shipyard...

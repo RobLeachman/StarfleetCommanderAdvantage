@@ -261,7 +261,7 @@ jQuery( document ).ready(function( $ ) {
     if (moduleEnabled)
         displayEnabled='enabled';
     var myVersion = GM_info.script.version;
-    console.log ('AllPlanets ver', myVersion, displayEnabled);
+    //console.log ('AllPlanets ver', myVersion, displayEnabled);
 
     /***
      * When the All Planets overview is displayed, if we got here from a click on our toolbar, switch to the appropriate tab.
