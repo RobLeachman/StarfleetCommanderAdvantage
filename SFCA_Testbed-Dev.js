@@ -785,7 +785,7 @@ function menuDisplay($, thePlanet, additionalItems) {
         $('#buttonBuild').click(function () {
             console.log("build");
 
-            $('#build_amount_2073344062').val(10); // one is fine for the test button...
+            $('#build_amount_2073344062').val(40); // one is fine for the test button...
 
             disable_ajax_links();
 
@@ -832,7 +832,7 @@ function Goalie($) {
 
     if ($('.technology.index').length) {
         var recommendedBuild = $('.recommendations').html().split('>')[3].split('<')[0];
-        console.log("MAKE '" + recommendedBuild + "'");
+        console.log("MAKE THIS: " + recommendedBuild);
         localStorage[this.universe + '-' + 'tech_' + this.planet] = recommendedBuild;
         this.recommendation = recommendedBuild;
     }
@@ -852,9 +852,17 @@ function Goalie($) {
     if (typeof costs !== 'undefined') {
         costRecommendation = costs.split('/')[0];
         console.log("costs computed for", costRecommendation);
-        upgradeOre = costs.split('/')[1];
-        upgradeCrystal = costs.split('/')[2];
-        upgradeHydro = costs.split('/')[3];
+
+        // Get the upgrade costs for the recommendation. Handle the case where we could have made a thing
+        // but did not and now the goal is different (or something... one time things got out of sync)
+        if (this.recommendation === costRecommendation) {
+            upgradeOre = costs.split('/')[1];
+            upgradeCrystal = costs.split('/')[2];
+            upgradeHydro = costs.split('/')[3];
+        } else {
+            console.log("out of sync, argh");
+            this.resetRecommendation($);
+        }
     }
 
     //var availableOre = parseInt($("#max_ore").val(), 10);
@@ -882,7 +890,7 @@ function Goalie($) {
     if (this.recommendation === costRecommendation) {
         this.costedRecommendation = this.recommendation + ' (ore:' + shortOre + ' crystal:' + shortCrystal + ' hydrogen:' + shortHydro + ')';
         if (shortOre + shortCrystal + shortHydro == 0) {
-            // if we are on the tech screen, confirmed good target and sufficent resources, do it!
+            // if we are on the tech screen, confirmed good target and sufficient resources, do it!
             if ($('.technology.index').length) {
                 this.costedRecommendation = this.recommendation + " - Build!";
                 this.setGoalMet($);
@@ -1047,6 +1055,7 @@ function Shipwright() {
     if (activatePlanet.length)
         this.planet = activatePlanet;
     this.buildState = localStorage[this.universe + '-build'];
+    console.log("DEBUG constructed, uni", this.universe, " state", this.buildState);
 }
 
 Shipwright.prototype = {
@@ -1086,7 +1095,7 @@ Shipwright.prototype = {
                 var buttonActive = $(this).find('.enabled').attr('style'); // not styled to be hidden
                 if (typeof buttonActive == 'undefined') {
                     goodBuild = true;
-                    console.log("Building", shipType, "number", id);
+                    //console.log("Shipwright is building", shipType, "number", id);
 
                     $('#build_amount_' + id).val(amount); // in prod make 2 or 3 at a time
 
@@ -1110,17 +1119,6 @@ Shipwright.prototype = {
             logger.log('d', 'Insufficient resources for build');
             this.buildError($, null, true);
         }
-
-
-        /**
-         $('#build_amount_2073344062').val(1); // in prod make 2 or 3 at a time
-
-         // fire the build request... if successful we'll get a new div and go to didBuild via listener
-         // else maybe we'll go to gotError if it doesn't work
-         disable_ajax_links();
-         new Ajax.Request('/buildings/shipyard/build/2073344062?current_planet=' + this.planet,
-         {asynchronous:true, evalScripts:true, parameters:Form.Element.serialize('build_amount_2073344062')});
-         */
     },
     buildSuccess: function ($) {
         // Key element found, now "this shipwright" is null, so get what we need
@@ -1129,17 +1127,13 @@ Shipwright.prototype = {
         var activatePlanet = gup('activate_planet');
         if (activatePlanet.length)
             planet = activatePlanet;
-        var buildState = localStorage[this.universe + '-build'];
+        var buildState = localStorage[universe + '-build'];
 
         var logger = new Logger(universe);
         logger.log('d', 'Did build, state=' + buildState);
-        if (buildState === 'carmanor') {
-            console.log("DEBUG got carms");
-            localStorage[universe + '-build'] = 'built';
-            window.location.href = "/fleet?current_planet=" + planet;
-        } else {
-            console.log('DEBUG testing continues...');
-        }
+
+        //localStorage[universe + '-build'] = 'built';
+        window.location.href = "/fleet?current_planet=" + planet;
     },
     /**
      * If an error is displayed (from their Ajax) log it, but if from our calcs simply handle the error.
@@ -1255,12 +1249,14 @@ jQuery(document).ready(function ($) {
         var wright = new Shipwright();
         if (wright.getBuildState() === 'carmanor') {
             console.log("Must keep going with shipwright!");
-            wright.buildShip($, 'Carmanor Class Cargo', 1);
-            //wright.buildShip($, 'Hermes Class Probe', 1);
+            //wright.buildShip($, 'Carmanor Class Cargo', 1);
+            wright.buildShip($, 'Hermes Class Probe', 1);
         } else {
             //wright.buildShip($, 'Athena Class Battleship', 1);
             //wright.buildShip($, 'Hermes Class Probe', 1);
             console.log("nothing built");
+
+            //console.log("FORCE BUILD"); wright.buildShip($, 'Carmanor Class Cargo', 30);
         }
     }
 
