@@ -373,7 +373,10 @@ function sleepNextPlanet($) {
     var sleepPlanet = sleepList.shift();
     if (sleepPlanet != undefined) {
         myGMsetValue('autoSleepPlanets', JSON.stringify(sleepList));
-        console.log("NEXT TO SLEEP:", sleepPlanet[0], sleepPlanet[1], sleepPlanet[2]);
+        //console.log("NEXT TO SLEEP:", sleepPlanet[0], sleepPlanet[1], sleepPlanet[2]);
+
+        var logger = new Logger();
+        logger.log('d', "Next to sleep=" + sleepPlanet[0] + ' ' + sleepPlanet[1] + ' ' + sleepPlanet[2]);
 
         // mark each we need to do
         markPlanetsToSave($);
@@ -443,11 +446,14 @@ function doSetupAuto($) {
     logger.log('d', "sleep list=" + JSON.stringify(saveState));
     myGMsetValue('autoSleepPlanets', JSON.stringify(saveState));
 
-
     var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
     localStorage[universe + '-autoSleep'] = "true";
     var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
     logger.log('d','Sleep tomorrow seconds='+tomorrowSecs);
+
+    // Just keep a list (the same list) of planets that need attention of the shipwright, so to do each one time only
+    localStorage[universe + '-checkCargo'] = JSON.stringify(saveState);
+
     // sleep the first planet in the list...
     sleepNextPlanet($);
 }
@@ -456,7 +462,7 @@ function doSetupAuto($) {
 // this is inserted Javascript, not user script!
 function do_setupSleep(planet) {
     // this cookie shit is hokey as hell                                   TODO: must fix
-    document.cookie = 'set_sleep_cookie=' + planet + ';path=/';
+    document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
 
     //myGMsetValue('sleep_this_planet','true');                        // TODO: can't simply use GM because javascript...
     window.location.href = '/fleet?current_planet=' + planet;
@@ -599,10 +605,15 @@ function do_sleepAllFromFleet($) {
 }
 
 function doBuildAndSleep($) {
-    console.log("BUILD");
+    /**
+     * DEVELOP/DEBUG: sets the build state to make more carmanors, then fires the fleets screen...
+     *
+     * When the shipyard screen is served, the build state tells the shipwright (in Testbed) to
+     * build more carmanors.
+     */
     var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
 
-    //TODO: when SleepSave is refactored as an object, we won't need to do this...
+    //TODO: when SleepSave is refactored as an object, we won't need to do this part...
     var thePlanet = gup('current_planet');
     var activatePlanet = gup('activate_planet');
     if (activatePlanet.length)
@@ -610,7 +621,8 @@ function doBuildAndSleep($) {
 
     console.log("DEBUG build and sleep");
     localStorage[universe + '-build'] = "carmanor";
-    window.location.href = "/fleet?current_planet=" + thePlanet;
+    window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+
 }
 
 // Get the number of Carmanor freight ships, return true if sufficient else... we'll want to build some more
@@ -644,6 +656,7 @@ function enoughCarms($) {
     }
 }
 
+// Incomplete, and now I'm not even sure what I was thinking...
 function calculateDurationFromInterval($, interval) {
     var logger = new Logger();
     logger.log('d', 'Calculating duration for interval ' + interval);
@@ -708,7 +721,6 @@ function initSleepsave($, manual) {
         doAutoAbort($);
     }
 
-
     // Distance: negative is # of planets away, positive is # of systems away, 0 is the home planet
     var targetDist = myGMgetValue('SleepDist', 1);
     // Speed: 0=100% 9=10%
@@ -765,114 +777,136 @@ function initSleepsave($, manual) {
 
 
     } else {
-        //console.log("DEBUG: Autosleep!");
-
         //TODO: when SleepSave is refactored as an object, we won't need to do this...
         var thePlanet = gup('current_planet');
         var activatePlanet = gup('activate_planet');
         if (activatePlanet.length)
             thePlanet = activatePlanet;
 
+        var didShipBuilder = localStorage[this.universe + '-didShipBuilder'];
+        if (typeof didShipBuilder == 'undefined') {
+            logger.log('d',"ONE TIME this will work...");
+            localStorage[this.universe + '-didShipBuilder'] = 'ONCE';
 
-        logger.log('d', ">> Autosleep " + thePlanet);
-        var speedField = document.getElementById('speed');
-        console.log("HAVE SHIPS? test more...");
-        if (speedField === null) { //TODO: got lazy here, null test always bad, fix
-            logger.log('e', "ERROR no ships");
-        }
-
-        // We're performing a sleepsave, add a flag to the screen (for our fleet buttons widget function)
-        /**
-         * DEV NOTE: here's one way to manage communication between scripts, adding a hidden element...
-         */
-        var sleepFlag = document.createElement("div");
-        //sleepFlag.setAttribute('style', 'display:none;'); //TODO: actually hide it
-        sleepFlag.setAttribute('id', 'SFCA_sleep');
-        //sleepFlag.setAttribute('class', 'hidden');
-        sleepFlag.innerHTML = 'SFCA sleep flag';
-        $('#current_planet_type').after(sleepFlag);
-
-        var universe = window.location.href.split('.')[0].split('/')[2];  //TODO: when this is an object, all will be well and less of a hack?
-        var interval = localStorage[universe + '-fleetInterval'];
-        if (typeof interval === 'undefined') {
-            logger.log('w', 'WARN: no interval, must punt');
+            // restore the cookie so we'll come back and try again, then go do the build...
+            document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+            window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
         } else {
-            // As soon as it's ready, use this function:
-
-            // var result = calculateDurationFromInterval($,interval);
-
-            // sleepSpeed = result[0];
-            // targetDist = result[1];
-            // logger.log('d',"DEBUG calculated speed="+sleepSpeed+" distance="+targetDist);
-
-            // <INSTEAD OF this:>
-
-            logger.log('d', 'Sleep interval=' + interval);
-            //sleepSpeed = 10 - parseInt(interval, 10);
-            var theInterval = parseInt(interval, 10);
-            if (theInterval > 9) {
-                logger.log('d', 'Tomorrow, always tomorrow');
-                var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
-                logger.log('d','Target secs='+tomorrowSecs);
-                if (typeof tomorrowSecs === 'undefined') {
-                    logger.log('w','There is no tomorrow');
-                } else {
-
-                    var sleepPicks = generateSleepPicks();
-
-                    var morningPick = 0;
-                    for (var k = 0; k < sleepPicks.length; k++) {
-                        morningPick = sleepPicks[k];
-                        var sleepSecs = parseInt(morningPick.split("/")[1].split("~")[0], 10);
-                        console.log("TOMORROW ", sleepPicks[k], sleepSecs);
-
-                        if (sleepSecs > tomorrowSecs) {
-                            break;
-                        }
-                    }
-                    logger.log('d', 'Tomorrow return=' + morningPick);
-
-
-                    var opts = morningPick.split("~")[1];
-                    console.log("  opts=" + opts);
-                    var speedOpt = opts.split(";")[0];
-
-                    // I'm tired and need to sleep, rather the point of this exercise... so here's some shit:
-
-
-                    //sleepSpeed = 10 - speedOpt //TODO or something, fix this shitty code
-
-
-                    if (speedOpt == 10) sleepSpeed = 0;
-                    if (speedOpt == 9) sleepSpeed = 1;
-                    if (speedOpt == 8) sleepSpeed = 2;
-                    if (speedOpt == 7) sleepSpeed = 3;
-                    if (speedOpt == 6) sleepSpeed = 4;
-                    if (speedOpt == 5) sleepSpeed = 5;
-                    if (speedOpt == 4) sleepSpeed = 6;
-                    if (speedOpt == 3) sleepSpeed = 7;
-                    if (speedOpt == 2) sleepSpeed = 8;
-                    if (speedOpt == 1) sleepSpeed = 9;
-
-                    var distOpt = opts.split(";")[1].split("(")[0];
-                    //console.log("PICK TIME: speedOpt=" + speedOpt + " sleepSpeed=" + sleepSpeed + " dist=" + distOpt);
-                    console.log("Selected speed=" + sleepSpeed + " dist=" + distOpt);
-
-
-                    targetDist = distOpt;
-                }
-
-            }
-            // </INSTEAD>
+            logger.log('d','BEEN THERE DONE THAT');
+            localStorage.removeItem(this.universe + '-didShipBuilder');
+            doAutoSleep($, thePlanet, targetDist, sleepSpeed);
         }
-
-        logger.log('d', 'Sleepsave fires, speed=' + sleepSpeed + ' dist=' + targetDist);
-
-        //console.log("DEBUG SKIP SLEEP");
-        //return;
-
-        do_sleepsave(targetDist, sleepSpeed, false);
     }
+}
+
+/**
+ * Finally, do the sleepsave for this planet... this located nicely above until I needed a branch for cargo build
+ *
+ * @param $             jQuery
+ * @param thePlanet     the current planet
+ * @param targetDist    distance to travel
+ * @param sleepSpeed    speed
+ */
+function doAutoSleep($, thePlanet, targetDist, sleepSpeed) {
+    var logger = new Logger();
+
+    logger.log('d', ">> Autosleep " + thePlanet);
+
+    var speedField = document.getElementById('speed');
+    console.log("HAVE SHIPS? test more...");
+    if (speedField === null) { //TODO: got lazy here, null test always bad, fix
+        logger.log('e', "ERROR no ships");
+    }
+
+    // We're performing a sleepsave, add a flag to the screen (for our fleet buttons widget function)
+    /**
+     * DEV NOTE: here's one way to manage communication between scripts, adding a hidden element...
+     */
+    var sleepFlag = document.createElement("div");
+    //sleepFlag.setAttribute('style', 'display:none;'); //TODO: actually hide it
+    sleepFlag.setAttribute('id', 'SFCA_sleep');
+    //sleepFlag.setAttribute('class', 'hidden');
+    sleepFlag.innerHTML = 'SFCA sleep flag';
+    $('#current_planet_type').after(sleepFlag);
+
+    var universe = window.location.href.split('.')[0].split('/')[2];  //TODO: when this is an object, all will be well and less of a hack?
+    var interval = localStorage[universe + '-fleetInterval'];
+    if (typeof interval === 'undefined') {
+        logger.log('w', 'WARN: no interval, must punt');
+    } else {
+        // As soon as it's ready, use this function:
+
+        // var result = calculateDurationFromInterval($,interval);
+
+        // sleepSpeed = result[0];
+        // targetDist = result[1];
+        // logger.log('d',"DEBUG calculated speed="+sleepSpeed+" distance="+targetDist);
+
+        // <INSTEAD OF this:>
+
+        logger.log('d', 'Sleep interval=' + interval);
+        //sleepSpeed = 10 - parseInt(interval, 10);
+        var theInterval = parseInt(interval, 10);
+        if (theInterval > 9) {
+            logger.log('d', 'Tomorrow, always tomorrow');
+            var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
+            logger.log('d','Target secs='+tomorrowSecs);
+            if (typeof tomorrowSecs === 'undefined') {
+                logger.log('w','There is no tomorrow');
+            } else {
+
+                var sleepPicks = generateSleepPicks();
+
+                var morningPick = 0;
+                for (var k = 0; k < sleepPicks.length; k++) {
+                    morningPick = sleepPicks[k];
+                    var sleepSecs = parseInt(morningPick.split("/")[1].split("~")[0], 10);
+                    console.log("TOMORROW ", sleepPicks[k], sleepSecs);
+
+                    if (sleepSecs > tomorrowSecs) {
+                        break;
+                    }
+                }
+                logger.log('d', 'Tomorrow return=' + morningPick);
+
+
+                var opts = morningPick.split("~")[1];
+                console.log("  opts=" + opts);
+                var speedOpt = opts.split(";")[0];
+
+                // I'm tired and need to sleep, rather the point of this exercise... so here's some shit:
+
+                //sleepSpeed = 10 - speedOpt //TODO or something, fix this shitty code
+
+                if (speedOpt == 10) sleepSpeed = 0;
+                if (speedOpt == 9) sleepSpeed = 1;
+                if (speedOpt == 8) sleepSpeed = 2;
+                if (speedOpt == 7) sleepSpeed = 3;
+                if (speedOpt == 6) sleepSpeed = 4;
+                if (speedOpt == 5) sleepSpeed = 5;
+                if (speedOpt == 4) sleepSpeed = 6;
+                if (speedOpt == 3) sleepSpeed = 7;
+                if (speedOpt == 2) sleepSpeed = 8;
+                if (speedOpt == 1) sleepSpeed = 9;
+
+                var distOpt = opts.split(";")[1].split("(")[0];
+                //console.log("PICK TIME: speedOpt=" + speedOpt + " sleepSpeed=" + sleepSpeed + " dist=" + distOpt);
+
+                targetDist = distOpt;
+            }
+
+        }
+        // </INSTEAD>
+    }
+
+    logger.log('d', 'Sleepsave fires, speed=' + sleepSpeed + ' dist=' + targetDist);
+
+    //console.log("DEBUG SKIP SLEEP");
+    //return;
+
+    do_sleepsave(targetDist, sleepSpeed, false);
+
+
 }
 
 // this is injected into the page, it's NOT userscript!
@@ -1936,19 +1970,26 @@ jQuery(document).ready(function ($) {
         toggleFleetDisplay = setToggleFleets;
     }
 
-    // On the fleet screen, display the toggle option ...
+    // On the fleet screen, display the toggle option and then see if we have enough cargo...
     if ($('#content.fleet.index').length) {
-
-        //console.log("BREAK IT");
-        //document.cookie = "set_sleep_cookie=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
 
         // Wrap the table in a div for easier hide                                       //TODO:Do we really need this?
         $("#tasks").wrap("<div id='fleetWrapper' style='display:" + toggleFleetDisplay + "'></div>");
         addMyFleetbar($);
 
+        console.log("DEBUG auto ship builder");
+        //localStorage[universe + '-build'] = "carmanor";
+
         var enough = enoughCarms($);
         if (!enough) {
             console.log("BUILD more carms!");
+
+            // get some built, go to the shipyard page, the shipwright will send us back here... //todo make that happen
+            //localStorage[universe + '-build'] = "carmanor";
+            //window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+
+
+
         } else {
             console.log("BUILD sufficient carms");
         }
@@ -1959,14 +2000,12 @@ jQuery(document).ready(function ($) {
             console.log("ERROR!");
             logger.log('e', "ERROR" + $('.error').first().html());
 
-            var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
             var aaa = localStorage[universe + '-autoSleep'];
             var autoSleepActive = (aaa === 'true'); //TODO: we can do better than this!
 
 
             if (autoSleepActive) {
 
-                var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
                 localStorage[universe + '-autoSleep'] = "false";
 
                 document.cookie = "set_didSleep=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
@@ -1984,10 +2023,35 @@ jQuery(document).ready(function ($) {
             // if we got here from the ships overview, handle the request to sleepsave this fleet
             var doSleep = getCookie('set_sleep_cookie');
             if (doSleep.length) {
+                // Ready to perform an automated sleep save, but first let's see if we need more cargo...
+                logger.log('d','DO SLEEP...');
 
-                console.log("DO SLEEP...");
+                /**
+                 * this "go builder" shit is all wrong...
 
-                // not manual, we're full auto baby!
+                console.log("DEBUG doing auto sleep ship builder");
+                logger.log('d',"go builder started");
+                var shipwrightBuildState = localStorage[universe + '-build'];
+                if (shipwrightBuildState === "go") {
+                    logger.log('d','go builder can build ships');
+
+                    var enough = enoughCarms($);
+                    if (!enough) {
+                        logger.log('d',"go builder needs more");
+
+                        localStorage[universe + '-build'] = "carmanor";
+                        window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+                    } else {
+                        logger.log('d',"go builder none needed");
+                    }
+
+                } else {
+                    logger.log('d',"blocked go builder");
+                }
+                logger.log('d',"go builder ended");
+*/
+
+                // do the automated sleepsave...
                 document.cookie = "set_sleep_cookie=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
                 initSleepsave($, false);
 
@@ -2011,11 +2075,7 @@ jQuery(document).ready(function ($) {
                         //logger.log('d', 'Good sleep');
                         document.cookie = "set_didSleep=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
 
-                        //var listCheck = JSON.parse(myGMgetValue('autoSleepPlanets', '[]'));
-                        //console.log("Sleep list check:", JSON.stringify(listCheck));
                         sleepNextPlanet($);
-                        //window.location.href = "/overview?current_planet=" + thePlanet;
-
                     }
                 }
                 else {
