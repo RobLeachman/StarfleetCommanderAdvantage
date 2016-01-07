@@ -398,7 +398,6 @@ function Resolve($, mainline) {
     this.hyperactive = false;
     var foundShadow = false; //TODO: the others aren't object properties but just state variables like this one
 
-
     if (mainline) {
         //console.log("Resolve BOJ, state=" + this.botState);
         // Find unexpired events...
@@ -537,12 +536,27 @@ Resolve.prototype = {
             //this.addTimerEvent($, '5:00,cloak');
         } else if (newState === "run") {
             console.log("  Not running, let's start!");
-            this.addTimerEvent($, '1:00:00,run');
+            this.addTimerEvent($, '18:00:00,run');
             //this.addTimerEvent($, '1:00:00,sunset');
             this.addTimerEvent($, 'shadow');
             logger.log('d', "NEW WATCHER: setstate=run");
-            this.addTimerEvent($, 'watch');
-            this.addTimerEvent($, 'sunset');
+            //this.addTimerEvent($, 'watch');
+            //this.addTimerEvent($, 'sunset');
+
+            /*
+             var d = new Date();
+             d.setHours(23,30,0,0);
+             logger.log('d','Goof date:' + d);
+             var myDate = new Date();
+             var now = myDate.getTime();
+             logger.log('d','Now  date:'+myDate);
+             */
+
+            this.addTimerEvent($, '18:00:00,watch');
+            this.addTimerEvent($, '18:00:00,sunset');
+
+
+
         } else if (newState === "cloak") { //unused
             console.log("  Cloak up!");
             this.addTimerEvent($, '1:00,cloak');
