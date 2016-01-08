@@ -1055,7 +1055,7 @@ function Shipwright() {
     if (activatePlanet.length)
         this.planet = activatePlanet;
     this.buildState = localStorage[this.universe + '-build'];
-    console.log("DEBUG constructed, uni", this.universe, " state", this.buildState);
+    //console.log("DEBUG constructed, uni", this.universe, " state", this.buildState);
 }
 
 Shipwright.prototype = {
@@ -1069,6 +1069,14 @@ Shipwright.prototype = {
         var logger = new Logger(this.universe);
         logger.log('d', 'set build state=' + newState);
         localStorage[this.universe + '-build'] = newState;
+    },
+    builderQueued: function ($) {
+        // Test if ships are being built right now, if so we don't want to queue more
+        var progressBar = $('.in_progress');
+        if (progressBar.length) {
+            return true;
+        }
+        return false;
     },
     buildShip: function ($, shipType, amount) {
         var logger = new Logger(this.universe);
@@ -1112,11 +1120,13 @@ Shipwright.prototype = {
                 return false;
             }
         });
+        // Handle the cases where we couldn't find the button, or it wasn't enabled, and get out
         if (!foundShip) {
+            // Bad code, abort (stop) here
             logger.log('e', 'Bad ship type=' + shipType);
         }
         if (!goodBuild) {
-            logger.log('d', 'Insufficient resources for build');
+            logger.log('i', 'Could not build ship (insufficient resources?');
             this.buildError($, null, true);
         }
     },
@@ -1132,7 +1142,7 @@ Shipwright.prototype = {
         var logger = new Logger(universe);
         logger.log('d', 'Did build, state=' + buildState);
 
-        //localStorage[universe + '-build'] = 'built';
+        localStorage[universe + '-build'] = 'built';
         window.location.href = "/fleet?current_planet=" + planet;
     },
     /**
@@ -1158,8 +1168,7 @@ Shipwright.prototype = {
         }
         // nothing to do but mark it built anyway and get out
         localStorage[universe + '-build'] = 'built';
-        console.log("DEBUG return to fleet...");
-        //window.location.href = "/fleet?current_planet=" + this.planet;
+        window.location.href = "/fleet?current_planet=" + this.planet;
     }
 };
 
@@ -1247,14 +1256,21 @@ jQuery(document).ready(function ($) {
         // When the shipyard screen is served and the build state specifies more freight is required, build a Carmanor.
         // The function will eventually return to the fleets screen and with a state of "built".
         var wright = new Shipwright();
+
         if (wright.getBuildState() === 'carmanor') {
-            console.log("Must keep going with shipwright!");
-            //wright.buildShip($, 'Carmanor Class Cargo', 1);
-            wright.buildShip($, 'Hermes Class Probe', 1);
+            if (!wright.builderQueued($)) {
+                logger.log('d',"Can build...");
+                //wright.buildShip($, 'Hermes Class Probe', 1); // for debugging, build something quick...
+                wright.buildShip($, 'Carmanor Class Cargo', 30);
+            } else {
+                logger.log('d',"Already building...");
+                wright.buildError($, null, true);
+            }
+
+
         } else {
             //wright.buildShip($, 'Athena Class Battleship', 1);
             //wright.buildShip($, 'Hermes Class Probe', 1);
-            console.log("nothing built");
 
             //console.log("FORCE BUILD"); wright.buildShip($, 'Carmanor Class Cargo', 30);
         }
@@ -1266,13 +1282,6 @@ jQuery(document).ready(function ($) {
      */
     if ($('.buildings.home.index').length) {
 
-        /*
-         // If a build is in process, all bets are off for what comes next. Clear the recommendation.
-         var upgrade = $("#upgrade_in_progress").html().replace(/\s+/g, ''); // strip whitespace
-         if (upgrade.length) {
-         goalie.resetRecommendation($);
-         }
-         */
 
         if (goalie.goalMet($)) {
             logger.log('d', 'ready to build!!');
