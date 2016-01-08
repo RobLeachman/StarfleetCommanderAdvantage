@@ -625,8 +625,14 @@ function doBuildAndSleep($) {
 
 }
 
-// Get the number of Carmanor freight ships, return true if sufficient else... we'll want to build some more
-function enoughCarms($) {
+
+/**
+ *  Get the number of Carmanor freight ships, return true if sufficient else... we'll want to build some more
+ *
+ *  updateScreen: display calculated result (so the "enough" test can be called multiple times, all logic on one place)
+ **/
+function enoughCarms($, updateScreen) {
+    var logger = new Logger();
 
     //console.log($('.fleet > .row').html());
     var carmanors = 0;
@@ -646,8 +652,11 @@ function enoughCarms($) {
         var tot = parseInt($("#max_ore").val(), 10) + parseInt($("#max_crystal").val(), 10) + parseInt($("#max_hydrogen").val(), 10);
         //var loaded = (tot/available*100).toFixed(2);
         var loaded = (tot / available * 100).toFixed(0);
-        var fleetListOut = fleetListHTML.replace(/Carmanor Class Cargo/g, "Carmanor Class Cargo (" + loaded + "% loaded)");
-        $('.fleet_table > .fleet').html(fleetListOut);
+        if (updateScreen) {
+            //logger.log('d','Cargo load='+loaded);
+            var fleetListOut = fleetListHTML.replace(/Carmanor Class Cargo/g, "Carmanor Class Cargo (" + loaded + "% loaded)");
+            $('.fleet_table > .fleet').html(fleetListOut);
+        }
 
         return (loaded < 80);
     } else {
@@ -778,6 +787,7 @@ function initSleepsave($, manual) {
 
     } else {
         //TODO: when SleepSave is refactored as an object, we won't need to do this...
+        var universe = window.location.href.split('.')[0].split('/')[2];
         var thePlanet = gup('current_planet');
         var activatePlanet = gup('activate_planet');
         if (activatePlanet.length)
@@ -785,14 +795,27 @@ function initSleepsave($, manual) {
 
         var didShipBuilder = localStorage[this.universe + '-didShipBuilder'];
         if (typeof didShipBuilder == 'undefined') {
-            logger.log('d',"ONE TIME this will work...");
-            localStorage[this.universe + '-didShipBuilder'] = 'ONCE';
+            //logger.log('d',"Checking cargo capacity...");
+            localStorage[this.universe + '-didShipBuilder'] = 'only once per planet';
 
-            // restore the cookie so we'll come back and try again, then go do the build...
-            document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
-            window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+            var enough = enoughCarms($,false);
+            if (!enough) {
+                logger.log('d','BUILD more carms!');
+
+                // restore the cookie so we'll come back and try again, then go do the build...
+                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+
+                // get some built, go to the shipyard page, the shipwright will send us back here (via fleets)...
+                localStorage[universe + '-build'] = "carmanor";
+                window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+            } else {
+                logger.log('d','Sufficient cargo, now sleepsave');
+                localStorage.removeItem(this.universe + '-didShipBuilder');
+                doAutoSleep($, thePlanet, targetDist, sleepSpeed);
+            }
+
         } else {
-            logger.log('d','BEEN THERE DONE THAT');
+            logger.log('d','Cargo now building, do sleepsave');
             localStorage.removeItem(this.universe + '-didShipBuilder');
             doAutoSleep($, thePlanet, targetDist, sleepSpeed);
         }
@@ -1970,30 +1993,15 @@ jQuery(document).ready(function ($) {
         toggleFleetDisplay = setToggleFleets;
     }
 
-    // On the fleet screen, display the toggle option and then see if we have enough cargo...
+    // On the fleet screen, display the toggle option and handle any errors
     if ($('#content.fleet.index').length) {
+
+        // Display cargo load percentage
+        enoughCarms($,true);
 
         // Wrap the table in a div for easier hide                                       //TODO:Do we really need this?
         $("#tasks").wrap("<div id='fleetWrapper' style='display:" + toggleFleetDisplay + "'></div>");
         addMyFleetbar($);
-
-        console.log("DEBUG auto ship builder");
-        //localStorage[universe + '-build'] = "carmanor";
-
-        var enough = enoughCarms($);
-        if (!enough) {
-            console.log("BUILD more carms!");
-
-            // get some built, go to the shipyard page, the shipwright will send us back here... //todo make that happen
-            //localStorage[universe + '-build'] = "carmanor";
-            //window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
-
-
-
-        } else {
-            console.log("BUILD sufficient carms");
-        }
-
 
         var error = $('.error').first();
         if (error.length) {
@@ -2025,31 +2033,6 @@ jQuery(document).ready(function ($) {
             if (doSleep.length) {
                 // Ready to perform an automated sleep save, but first let's see if we need more cargo...
                 logger.log('d','DO SLEEP...');
-
-                /**
-                 * this "go builder" shit is all wrong...
-
-                console.log("DEBUG doing auto sleep ship builder");
-                logger.log('d',"go builder started");
-                var shipwrightBuildState = localStorage[universe + '-build'];
-                if (shipwrightBuildState === "go") {
-                    logger.log('d','go builder can build ships');
-
-                    var enough = enoughCarms($);
-                    if (!enough) {
-                        logger.log('d',"go builder needs more");
-
-                        localStorage[universe + '-build'] = "carmanor";
-                        window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
-                    } else {
-                        logger.log('d',"go builder none needed");
-                    }
-
-                } else {
-                    logger.log('d',"blocked go builder");
-                }
-                logger.log('d',"go builder ended");
-*/
 
                 // do the automated sleepsave...
                 document.cookie = "set_sleep_cookie=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
