@@ -556,7 +556,6 @@ Resolve.prototype = {
             this.addTimerEvent($, '18:00:00,sunset');
 
 
-
         } else if (newState === "cloak") { //unused
             console.log("  Cloak up!");
             this.addTimerEvent($, '1:00,cloak');
@@ -828,7 +827,10 @@ Resolve.prototype = {
                 myStart = fleetStart;
 
                 myEnd = fleetEnd;
-                console.log("** Are you a bot?"); myEnd = fleetEnd + 30;
+
+                // We used to be more paranoid about bot checking, so had longer delay
+                console.log("** Are you a bot?");
+                myEnd = fleetEnd + 30;
                 //myEnd = fleetEnd + 60;
 
                 callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
@@ -862,8 +864,6 @@ Resolve.prototype = {
                 //myEnd = fleetEnd + 60;
 
                 // </wrong>
-
-
 
 
                 callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
@@ -909,7 +909,7 @@ Resolve.prototype = {
                 missionType = "Sunset";
                 missionInfo = "It will be dark soon";
                 missionDest = "The night";
-                console.log("No vampires here, time specified="+adhoc);
+                console.log("No vampires here, time specified=" + adhoc);
 
             } else if (viewTarget == "chain") {
                 //myLog("Adding chained event...");
@@ -980,16 +980,16 @@ Resolve.prototype = {
             viewTarget = threeParms[1];
             var additional = threeParms[2];
             if (viewTarget === 'tomorrow') {
-                logger.log('d','set new tomorrow and the one after that too!');
+                logger.log('d', 'set new tomorrow and the one after that too!');
                 // 1:00,tomorrow,sunset=5:00;tomorrow=6:00
                 var splitNext = additional.split(';');
                 var nextSunset = splitNext[0];
                 var nextTomorrow = splitNext[1];
-                logger.log('d','next sunset='+nextSunset+' next tomorrow='+nextTomorrow);
+                logger.log('d', 'next sunset=' + nextSunset + ' next tomorrow=' + nextTomorrow);
 
                 var sunset = nextSunset.split('=')[1];
 
-                this.addTimerEvent($, nextSunset.split('=')[1]+',sunset');
+                this.addTimerEvent($, nextSunset.split('=')[1] + ',sunset');
 
                 callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
                 missionType = "Tomorrow";
@@ -999,7 +999,7 @@ Resolve.prototype = {
 
 
             } else {
-                logger.log('e',"Don't know what to do with "+adhoc);
+                logger.log('e', "Don't know what to do with " + adhoc);
                 return;
             }
         }
@@ -1188,8 +1188,8 @@ Resolve.prototype = {
      */
     saveTimedEvent: function ($, time, start, end, callback, type, dest, origin, info) {
         var argsDump = 'args=';
-        for (var k=0;k<arguments.length;k++) {
-            argsDump += k+'='+arguments[k]+' ';
+        for (var k = 0; k < arguments.length; k++) {
+            argsDump += k + '=' + arguments[k] + ' ';
         }
         var logger = new Logger();
         //logger.log('d','event args='+arguments.length+' '+argsDump);
