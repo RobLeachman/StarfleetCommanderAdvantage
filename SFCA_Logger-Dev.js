@@ -14,7 +14,9 @@
 //
 // USAGE:
 //
-// * Call as needed
+// * This file contains the objects needed by the driving functions. Originally it was just
+//   logger functions... now supplemented by the event storage object, goal builder, and
+//   building location.
 //
 //
 // KNOWN ISSUES
@@ -60,9 +62,7 @@ function Logger(universe) {
 
     } else {
         this.universe = universe;
-
     }
-
 
     this.count = localStorage[this.universe+'-logger_count'];
     if (typeof this.count == "undefined") {
@@ -240,6 +240,360 @@ Stores.prototype = {
          console.log("DEBUG: no delete, good to go, time will tell...");
          }
          */
+    }
+};
+
+
+function Location(e) {
+    var locationNameHTML = e.find('.name').html();
+    var linkText = /(>)(.*)(<)/;
+    var searchName = linkText.exec(locationNameHTML);
+    this.name = searchName[2];
+
+    this.buildingNumber = -1;
+    var buttonHTML = e.find('.action_link').html();
+    //console.log("Bzzt", buttonHTML);
+    if (typeof buttonHTML === 'string') {
+        buttonHTML = buttonHTML.replace(/\s+/g, '');
+        var buildingNumber = /(build\/)(.*)(\?)/;
+        var searchNumber = buildingNumber.exec(buttonHTML);
+        this.buildingNumber = searchNumber[2];
+
+        //TODO: get cracking on the builder
+        // class=" ajax link" contains enabled and disabled, the one that's not hidden is the can/can't be built clue...
+
+        // flag the buildings that can't be built
+        var enabledButton = /(enabled)(.*?)(>)/;
+        var searchEnabled = enabledButton.exec(buttonHTML);
+        //console.log("enabled", searchEnabled[2]);
+        if (searchEnabled[2] !== '"') {
+            this.buildingNumber *= -1;
+        }
+    }
+
+    /*
+     var buttonHTML = e.find('.action_link').html().replace(/\s+/g, '');
+     var buildingNumber = /(build\/)(.*)(\?)/;
+     var searchNumber = buildingNumber.exec(buttonHTML);
+     this.buildingNumber = searchNumber[2];
+     */
+
+
+
+
+
+    this.level = 0;
+    var level = linkText.exec(e.find('.level').html());
+    if (level instanceof Array) {
+        this.level = level[0].slice(1, -1);
+    }
+
+    this.oCost = this.upgradeCost(e.find('.row.ore.cost').children().first().next().html());
+    this.cCost = this.upgradeCost(e.find('.crystal.cost').children().first().next().html());
+    this.hCost = this.upgradeCost(e.find('.hydrogen.cost').children().first().next().html());
+
+    //if (this.name === "Ore Mine")
+    //    console.log("LOC name", this.name, this.level, this.oCost, this.cCost, this.hCost);
+
+    this.missileSlots = 0;
+    this.missileCount = 0;
+    this.needMissiles = false;
+
+    if (this.name === "Missile Silo") {
+        var rawCounts = e.find('.data.amount').html().replace(/\s+/g, '') + ">";
+        this.missileSlots = parseInt(rawCounts.split('>')[4], 10);
+        this.missileCount = parseInt(rawCounts.split('>')[1].split('<')[0], 10);
+        // ... and while we're at it
+        this.needMissiles = (this.missileSlots - this.missileCount > 0);
+        //console.log("Missilecounts", this.missileSlots, this.missileCount, this.needMissiles);
+    }
+}
+
+Location.prototype = {
+    constructor: Location,
+    isNamed: function (targetName) {
+        // real power here, ha ha
+        return this.name === targetName;
+    },
+    upgradeCost: function (costHTML) {
+        var cost = costHTML;
+        if (typeof cost === 'string') {
+            var bigOre = costHTML.split('"')[1];
+            if (typeof bigOre === 'string') {
+                cost = bigOre;
+            }
+            return parseInt(cost.replace(/,/g, ''), 10);
+        } else
+            return -1;
+    },
+    doUpgrade: function (logger, thisPlanet) {
+        if (this.buildingNumber < 0) {
+            logger.log('e', 'ERROR: cannot build ' + this.name);
+            return false;
+        } else {
+            logger.log('d', 'FINALLY See about building a ' + this.name + ' with number ' + this.buildingNumber);
+            //console.log("force fail"); this.buildingNumber = 111;
+
+            disable_ajax_links();
+            new Ajax.Request('/buildings/home/build/' + this.buildingNumber + '?current_planet=' + thisPlanet,
+                {
+                    asynchronous: true,
+                    evalScripts: true,
+                });
+            return true;
+        }
+    }
+};
+
+
+function Goalie($) {
+    this.universe = window.location.href.split('.')[0].split('/')[2];
+    this.planet = gup('current_planet');
+    var activatePlanet = gup('activate_planet');
+    if (activatePlanet.length)
+        this.planet = activatePlanet;
+
+    // Get the current recommendation
+    this.recommendation = localStorage[this.universe + '-' + 'tech_' + this.planet];
+    if (typeof this.recommendation == 'undefined') {
+        this.recommendation = "Undetermined";
+    }
+
+
+    /** Might still want something like this?
+
+     this.costedRecommendation = "none";
+     if (this.recommendation === costRecommendation) {
+        this.costedRecommendation = this.recommendation + ' (ore:' + shortOre + ' crystal:' + shortCrystal + ' hydrogen:' + shortHydro + ')';
+        if (shortOre + shortCrystal + shortHydro == 0) {
+            // if we are on the tech screen, confirmed good target and sufficient resources, do it!
+            if ($('.technology.index').length) {
+                this.costedRecommendation = this.recommendation + " - Build!";
+                this.setGoalMet($);
+            } else {
+                // probably fine, but let's reconfirm (need to see the current build target to be sure)
+                if (!this.goalMet($)) {
+                    this.costedRecommendation = this.recommendation + " - Ready?";
+                } else {
+                    this.costedRecommendation = this.recommendation + " - Build it!";
+
+                }
+            }
+        } else {
+            this.costedRecommendation = this.recommendation + ' (ore:' + shortOre + ' crystal:' + shortCrystal + ' hydrogen:' + shortHydro + ')';
+        }
+    } else {
+        this.costedRecommendation = this.recommendation + " (" + this.costedRecommendation + ")";
+    }
+     */
+}
+
+Goalie.prototype = {
+    constructor: Goalie,
+    // Called when the Tech screen is served, parse and save the recommended next upgrade to build.
+    determineRecommendation: function ($) {
+        var logger = new Logger(this.universe);
+
+        var recommendedBuild = $('.recommendations').html().split('>')[3].split('<')[0];
+        localStorage[this.universe + '-' + 'tech_' + this.planet] = recommendedBuild;
+        this.recommendation = recommendedBuild;
+        logger.log('d', 'Next goal: ' + recommendedBuild);
+    },
+    getGoal: function (logger) {
+        return this.recommendation;
+    },
+
+
+
+    /**
+     * Called when the building screen is served, parse and save the cost of the recommended upgrade.
+     * Handle yet another special case, if the planet's fields are full... flag it so we won't try to build.
+     *
+     * The output is an updated recommendation, with resource costs appended.
+     *
+     * @param $
+     * @param logger
+     * @returns {boolean} -- unused by caller
+     */
+    setCosts: function ($, logger) {
+        // "this" is redefined, so...
+        var thisUniverse = this.universe;
+        var thisPlanet = this.planet;
+        var rec = this.recommendation;
+
+        // Before anything else, check to see if the planet's fields are all filled.
+        var fullFieldsDiv = $(".fields_full_text").html();
+        if (typeof fullFieldsDiv !== 'undefined') {
+            logger.log('w','Cannot upgrade further, all fields are full!');
+            localStorage[thisUniverse + '-' + 'tech_' + thisPlanet] = 'FULL/FILLED/STUCK';
+            return false;
+        }
+
+        if (rec === "Undetermined") {
+            console.log("quietly do nothing");
+            return false;
+        }
+        logger.log('d', 'Getting costs for ' + rec);
+
+        // An invalid build target should be impossible, but since the effects are pretty bad if it happens... be sure
+        var foundTarget = false;
+
+        $('.row.location').each(function () {
+            var loc = new Location($(this));
+            if (loc.isNamed(rec)) {
+                logger.log('d', "FOUND COSTS " + rec + '/' + loc.oCost + '/' + loc.cCost + '/' + loc.hCost);
+                localStorage[thisUniverse + '-' + 'tech_' + thisPlanet] = rec + '/' + loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
+                foundTarget = true;
+                return false;
+            }
+        });
+        if (!foundTarget) {
+            localStorage[thisUniverse + '-' + 'tech_' + thisPlanet] = rec + '/' + 'INVALID!';
+        }
+    },
+    goalCosted: function (logger) {
+        // If there's a build in process, nothing more is required for costs
+        if (this.recommendation === 'UpgradeInProgress') {
+            return true;
+        }
+        var testGoalCosted = this.recommendation.split('/');
+        // If we have more than just a name...
+        return testGoalCosted.length > 1;
+    },
+    checkResources: function ($, logger) {
+        this.haveResources = false;
+        if (this.recommendation === 'Undetermined') {
+            logger.log('e','There is no goal');
+            return false;
+        }
+        if (this.testUpgradeInProgress($, logger)) {
+            console.log('Already building');
+            return false;
+        }
+        if (this.recommendation === "UpgradeInProgress") {
+            console.log("We were building, now we're not!!");
+            return false;
+        }
+        var costRecommendation = this.recommendation.split('/');
+        if (costRecommendation[0] == "FULL") {
+            logger.log('d','full fields!');
+            return false;
+        }
+        if (costRecommendation.length > 1) {
+            logger.log('d','costs computed for '+ costRecommendation);
+            var upgradeOre = this.recommendation.split('/')[1];
+            var upgradeCrystal = this.recommendation.split('/')[2];
+            var upgradeHydro = this.recommendation.split('/')[3];
+
+            if (upgradeOre == 'flagged') {
+                console.log('Goal flagged as failed');
+                return false;
+            }
+
+            var availableOre = parseInt($('#resource_ore').html().replace(/,/g, ''), 10);
+            var availableCrystal = parseInt($('#resource_crystal').html().replace(/,/g, ''), 10);
+            var availableHydro = parseInt($('#resource_hydrogen').html().replace(/,/g, ''), 10);
+
+            var shortOre = availableOre - upgradeOre;
+            var shortCrystal = availableCrystal - upgradeCrystal;
+            var shortHydro = availableHydro - upgradeHydro;
+
+            (shortOre < 0) ? shortOre *= -1 : shortOre = 0;
+            (shortCrystal < 0) ? shortCrystal *= -1 : shortCrystal = 0;
+            (shortHydro < 0) ? shortHydro *= -1 : shortHydro = 0;
+
+            this.haveResources = ((shortOre == 0) && (shortCrystal == 0) && (shortHydro == 0));
+            logger.log('d','have all=' + this.haveResources + ' short ore=' + shortOre + ' c=' + shortCrystal + 'h=' + shortHydro);
+
+            return this.haveResources;
+
+        } else {
+            logger.log('w',"uncosted recommendation");
+            return false;
+        }
+    },
+    /**
+     * From the Buildings screen, see if an upgrade is being built. In the event Buildings is not the current screen
+     * simply return false.
+     *
+     * @param $
+     * @param logger
+     * @returns {boolean} - true if we're on the buildings screen and can find an upgrade event timer
+     */
+    testUpgradeInProgress: function ($, logger) {
+        if (!$('.buildings.home.index').length) {
+            return false;
+        }
+        // We'd expect to always find this div, but for it to be blank unless the upgrade is displayed
+        var upgradeDiv = $("#upgrade_in_progress").html();
+        if (typeof upgradeDiv === 'undefined') {
+            return false;
+        }
+        var upgrade = upgradeDiv.replace(/\s+/g, ''); // strip whitespace
+        if (upgrade.length) {
+            logger.log('d', 'upgrade in progress');
+            return true;
+        } else {
+            logger.log('d', 'upgrade idle');
+            return false;
+        }
+    },
+    buildTheUpgrade: function ($, logger, thisPlanet) {
+
+        // If a build is in process, all bets are off for what comes next. Clear the recommendation.
+        var upgradeWasRequested = false;
+        var upgrade = $("#upgrade_in_progress").html().replace(/\s+/g, ''); // strip whitespace
+        if (upgrade.length) {
+            logger.log('e', 'building already in progress');
+        } else {
+            var rec = this.recommendation;
+            var bldg = this.recommendation.split('/')[0];
+            logger.log('d', 'JUST BUILD IT ' + bldg);
+
+            $('.row.location').each(function () {
+                var loc = new Location($(this));
+                if (loc.isNamed(bldg)) {
+                    var goodBuild = loc.doUpgrade(logger, thisPlanet);
+                    if (!goodBuild) {
+                        console.log("BAD BUILD");
+                    } else {
+                        console.log("FINE BUILD");
+                        upgradeWasRequested = true;
+                    }
+                    return false;
+                }
+            });
+        }
+
+        if (upgradeWasRequested) {
+            console.log("upgrade built, or not");
+        } else {
+            logger.log('e', 'upgrade request surely failed, building=' + bldg);
+        }
+        return upgradeWasRequested;
+    },
+    // This one is probably wrong...
+    getRecommendation: function ($) {
+        return this.recommendation;
+    },
+    flagGoal: function (reason) {
+        var recommendedBuild = "FAILED/flagged/" + reason;
+        localStorage[this.universe + '-' + 'tech_' + this.planet] = recommendedBuild;
+        this.recommendation = recommendedBuild;
+    },
+    buildRequestSuccess: function() {
+        var recommendedBuild = "UpgradeInProgress";
+        localStorage[this.universe + '-' + 'tech_' + this.planet] = recommendedBuild;
+        this.recommendation = recommendedBuild;
+    },
+    // Called when there is no active build, if the last thing we knew we were building, then it's done!
+    // Clear the flag so we will find and build another goal.
+    upgradeComplete: function(logger) {
+        if (this.recommendation === "UpgradeInProgress") {
+            logger.log('d','Upgrade Builder Success!');
+            localStorage.removeItem(this.universe + '-' + 'tech_' + this.planet);
+            return true;
+        }
     }
 };
 
