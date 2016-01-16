@@ -1521,10 +1521,10 @@ Resolve.prototype = {
  *
  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
 jQuery(document).ready(function ($) {
+    var uni = window.location.href.split('.')[0].split('/')[2];
 
-    var logger = new Logger();
+    var logger = new Logger(uni);
     //logger.log('d','Resolve version ' + GM_info.script.version);
-
 
     // With steel resolution to never lose a ship or bit of resources, we init BOJ
     var r = new Resolve($, true);
