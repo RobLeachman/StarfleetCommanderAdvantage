@@ -562,7 +562,7 @@ function doResearchReport($) {
             } else {
 
                 var p = stripCoordsFromPlanetRow($, $this);
-                console.log("DEBUG processing ",p);
+                console.log("DEBUG processing ", p);
 
                 var ore = $this.children('td').first().next();
                 var crystal = $this.children('td').first().next().next();
@@ -676,8 +676,8 @@ function doResearchReport($) {
     var rows = $table.find('tr').get();
 
     rows.sort(function (a, b) {
-        var keyA = parseInt( $(a).attr('lab_level'), 10);
-        var keyB = parseInt( $(b).attr('lab_level'), 10);
+        var keyA = parseInt($(a).attr('lab_level'), 10);
+        var keyB = parseInt($(b).attr('lab_level'), 10);
         if (isNaN(keyA)) {
             keyA = 0;
         }
@@ -815,9 +815,6 @@ function menuDisplay($, thePlanet, additionalItems) {
 
 
 }
-
-
-
 
 
 function Shipwright() {
@@ -996,9 +993,6 @@ jQuery(document).ready(function ($) {
     var doingSleep = $('#SFCA_sleep').length;
 
 
-
-
-
     /**
      * Provide a single button to clear messages and logs...
      */
@@ -1027,11 +1021,11 @@ jQuery(document).ready(function ($) {
 
         if (wright.getBuildState() === 'carmanor') {
             if (!wright.builderQueued($)) {
-                logger.log('d',"Can build...");
+                logger.log('d', "Can build...");
                 //wright.buildShip($, 'Hermes Class Probe', 1); // for debugging, build something quick...
                 wright.buildShip($, 'Carmanor Class Cargo', 30);
             } else {
-                logger.log('d',"Already building...");
+                logger.log('d', "Already building...");
                 wright.buildError($, null, true);
             }
 
@@ -1082,7 +1076,6 @@ jQuery(document).ready(function ($) {
     }
 
 
-
     if (onFleets && (!doingSleep)) {
 
         var coords = $('.target_planet');
@@ -1127,7 +1120,7 @@ jQuery(document).ready(function ($) {
     }
 
     // Get and display the current recommendation
-    var goalie=new Goalie($);
+    var goalie = new Goalie($);
 
     //emitStatusMessage("GOAL: "+ goalie.getRecommendation($), true);
     var additionalItems = "GOAL: " + goalie.getRecommendation($);
