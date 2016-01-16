@@ -461,7 +461,6 @@ function confirmIfFree($, popup) {
 
 // displaying the Resources tab, as evidenced by the fields column...
 function displayingResources($, fields) {
-    console.log(" Research report default...");
     //doResearchReport($);
     toolbarResources($);
 
@@ -817,236 +816,9 @@ function menuDisplay($, thePlanet, additionalItems) {
 
 }
 
-function Goalie($) {
-    this.universe = window.location.href.split('.')[0].split('/')[2];
-    this.planet = gup('current_planet');
-    var activatePlanet = gup('activate_planet');
-    if (activatePlanet.length)
-        this.planet = activatePlanet;
-
-    // Get the current recommendation. If there isn't any, and we're on the tech screen, establish new goal.
-    this.recommendation = localStorage[this.universe + '-' + 'tech_' + this.planet];
-    if (typeof this.recommendation == 'undefined') {
-        this.recommendation = "Undetermined";
-    }
-
-    if ($('.technology.index').length) {
-        var recommendedBuild = $('.recommendations').html().split('>')[3].split('<')[0];
-        console.log("MAKE THIS: " + recommendedBuild);
-        localStorage[this.universe + '-' + 'tech_' + this.planet] = recommendedBuild;
-        this.recommendation = recommendedBuild;
-    }
-
-    // If we're on the building screen and currently building something, clear any recommendations (and we're done?)
-    if ($('.buildings.home.index').length) {
-        // If a build is in process, all bets are off for what comes next. Clear the recommendation.
-        var upgrade = $("#upgrade_in_progress").html().replace(/\s+/g, ''); // strip whitespace
-        if (upgrade.length) {
-            this.resetRecommendation($);
-        }
-    }
-
-    var upgradeOre = 0, upgradeCrystal = 0, upgradeHydro = 0;
-    var costRecommendation = "unknown";
-    var costs = localStorage[this.universe + '-' + 'techCost_' + this.planet];
-    if (typeof costs !== 'undefined') {
-        costRecommendation = costs.split('/')[0];
-        console.log("costs computed for", costRecommendation);
-
-        // Get the upgrade costs for the recommendation. Handle the case where we could have made a thing
-        // but did not and now the goal is different (or something... one time things got out of sync)
-        if (this.recommendation === costRecommendation) {
-            upgradeOre = costs.split('/')[1];
-            upgradeCrystal = costs.split('/')[2];
-            upgradeHydro = costs.split('/')[3];
-        } else {
-            console.log("out of sync, argh");
-            this.resetRecommendation($);
-        }
-    }
-
-    //var availableOre = parseInt($("#max_ore").val(), 10);
-    var availableOre = parseInt($('#resource_ore').html().replace(/,/g, ''), 10);
-    var availableCrystal = parseInt($('#resource_crystal').html().replace(/,/g, ''), 10);
-    var availableHydro = parseInt($('#resource_hydrogen').html().replace(/,/g, ''), 10);
-    /*
-     console.log('ro', resourceOre);
-     var availableOre = parseInt($("#max_ore").val(), 10);
-
-     var availableCrystal = parseInt($("#max_crystal").val(), 10);
-     var availableHydro = parseInt($("#max_hydrogen").val(), 10);
-     console.log('ah', availableHydro);
-     */
-
-    var shortOre = availableOre - upgradeOre;
-    var shortCrystal = availableCrystal - upgradeCrystal;
-    var shortHydro = availableHydro - upgradeHydro;
-
-    (shortOre < 0) ? shortOre *= -1 : shortOre = 0;
-    (shortCrystal < 0) ? shortCrystal *= -1 : shortCrystal = 0;
-    (shortHydro < 0) ? shortHydro *= -1 : shortHydro = 0;
-
-    this.costedRecommendation = "none";
-    if (this.recommendation === costRecommendation) {
-        this.costedRecommendation = this.recommendation + ' (ore:' + shortOre + ' crystal:' + shortCrystal + ' hydrogen:' + shortHydro + ')';
-        if (shortOre + shortCrystal + shortHydro == 0) {
-            // if we are on the tech screen, confirmed good target and sufficient resources, do it!
-            if ($('.technology.index').length) {
-                this.costedRecommendation = this.recommendation + " - Build!";
-                this.setGoalMet($);
-            } else {
-                // probably fine, but let's reconfirm (need to see the current build target to be sure)
-                if (!this.goalMet($)) {
-                    this.costedRecommendation = this.recommendation + " - Ready?";
-                } else {
-                    this.costedRecommendation = this.recommendation + " - Build it!";
-
-                }
-            }
-        } else {
-            this.costedRecommendation = this.recommendation + ' (ore:' + shortOre + ' crystal:' + shortCrystal + ' hydrogen:' + shortHydro + ')';
-        }
-    } else {
-        this.costedRecommendation = this.recommendation + " (" + this.costedRecommendation + ")";
-    }
-}
-
-Goalie.prototype = {
-    constructor: Goalie,
-    resetRecommendation: function ($) {
-        console.log("Reset goal to building state");
-        localStorage.removeItem(this.universe + '-' + 'tech_' + this.planet);
-        localStorage.removeItem(this.universe + '-' + 'techCost_' + this.planet);
-    },
-    getRecommendation: function ($) {
-        if (this.costedRecommendation !== 'none') {
-            return this.costedRecommendation;
-        }
-        return this.recommendation;
-    },
-    getCosts: function ($) {
-        var logger = new Logger(this.universe);
-        //logger.log('d','Getting costs for '+this.recommendation);
-
-        //if the costs have been flagged, the goal is met, don
-
-        var rec = this.recommendation;
-        var uni = this.universe;
-        var planet = this.planet;
-        $('.row.location').each(function () {
-            var loc = new Location($(this));
-            if (loc.isNamed(rec)) {
-                console.log("found recommendation " + uni + '-' + 'techCost_' + planet);
-                localStorage[uni + '-' + 'techCost_' + planet] = rec + '/' + loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
-            }
-        });
-    },
-    setGoalMet: function ($) {
-        var logger = new Logger(this.universe);
-        logger.log('d', 'Getting costs for ' + this.recommendation);
-
-        var rec = this.recommendation;
-        var uni = this.universe;
-        var planet = this.planet;
-        localStorage[uni + '-' + 'techCost_' + planet] = rec + '/' + -999 + '/' + -999 + '/' + -999;
-        console.log("TEST GOAL MET", this.goalMet($));
-    },
-    goalMet: function ($) {
-        var costs = localStorage[this.universe + '-' + 'techCost_' + this.planet];
-        console.log("DEBUG costs", costs);
-        if (typeof costs !== 'undefined') {
-            var upgradeOre = costs.split('/')[1];
-            console.log("ORE FLAG", upgradeOre);
-            return (upgradeOre === '-999');
-        }
-        return false;
-    },
-    getGoalLink: function ($) {
-
-    }
-};
-
-function Location(e) {
-    var locationNameHTML = e.find('.name').html();
-    var linkText = /(>)(.*)(<)/;
-    var searchName = linkText.exec(locationNameHTML);
-    this.name = searchName[2];
-
-    this.buildingNumber = -1;
-    var buttonHTML = e.find('.action_link').html();
-    //console.log("Bzzt", buttonHTML);
-    if (typeof buttonHTML === 'string') {
-        buttonHTML = buttonHTML.replace(/\s+/g, '');
-        var buildingNumber = /(build\/)(.*)(\?)/;
-        var searchNumber = buildingNumber.exec(buttonHTML);
-        this.buildingNumber = searchNumber[2];
-
-        // flag the buildings that can't be built
-        var enabledButton = /(enabled)(.*?)(>)/;
-        var searchEnabled = enabledButton.exec(buttonHTML);
-        //console.log("enabled", searchEnabled[2]);
-        if (searchEnabled[2] !== '"') {
-            this.buildingNumber *= -1;
-        }
-    }
-
-    /*
-     var buttonHTML = e.find('.action_link').html().replace(/\s+/g, '');
-     var buildingNumber = /(build\/)(.*)(\?)/;
-     var searchNumber = buildingNumber.exec(buttonHTML);
-     this.buildingNumber = searchNumber[2];
-     */
 
 
-    // pick it up about here...
-    //console.log("LOC name", this.name, "number", this.buildingNumber, this.buildingNumber > 0);
 
-
-    this.level = 0;
-    var level = linkText.exec(e.find('.level').html());
-    if (level instanceof Array) {
-        this.level = level[0].slice(1, -1);
-    }
-
-    this.oCost = this.upgradeCost(e.find('.row.ore.cost').children().first().next().html());
-    this.cCost = this.upgradeCost(e.find('.crystal.cost').children().first().next().html());
-    this.hCost = this.upgradeCost(e.find('.hydrogen.cost').children().first().next().html());
-
-    //if (this.name === "Ore Mine")
-    //    console.log("LOC name", this.name, this.level, this.oCost, this.cCost, this.hCost);
-
-    this.missileSlots = 0;
-    this.missileCount = 0;
-    this.needMissiles = false;
-
-    if (this.name === "Missile Silo") {
-        var rawCounts = e.find('.data.amount').html().replace(/\s+/g, '') + ">";
-        this.missileSlots = parseInt(rawCounts.split('>')[4], 10);
-        this.missileCount = parseInt(rawCounts.split('>')[1].split('<')[0], 10);
-        // ... and while we're at it
-        this.needMissiles = (this.missileSlots - this.missileCount > 0);
-        //console.log("Missilecounts", this.missileSlots, this.missileCount, this.needMissiles);
-    }
-}
-
-Location.prototype = {
-    constructor: Location,
-    isNamed: function (targetName) {
-        // real power here, ha ha
-        return this.name === targetName;
-    },
-    upgradeCost: function (costHTML) {
-        var cost = costHTML;
-        if (typeof cost === 'string') {
-            var bigOre = costHTML.split('"')[1];
-            if (typeof bigOre === 'string') {
-                cost = bigOre;
-            }
-            return parseInt(cost.replace(/,/g, ''), 10);
-        } else
-            return -1;
-    }
-};
 
 function Shipwright() {
     this.universe = window.location.href.split('.')[0].split('/')[2];
@@ -1173,7 +945,6 @@ Shipwright.prototype = {
 };
 
 function doPurgeEverything() {
-    console.log("Go for it");
     // select all messages, as they do, then delete...
     check_all_message_pages(21); // no idea what the message count here does
     delete_clicked();
@@ -1196,7 +967,7 @@ jQuery(document).ready(function ($) {
 
     var logger = new Logger();
     //logger.log('d','Testbed version ' + GM_info.script.version);
-    console.log('===================================');
+    //console.log('===================================');
 
     var thePlanet = gup('current_planet');
     var activatePlanet = gup('activate_planet');
@@ -1204,9 +975,6 @@ jQuery(document).ready(function ($) {
         thePlanet = activatePlanet;
 
     var uni = window.location.href.split('.')[0].split('/')[2];
-
-    var goalie = new Goalie($);
-
 
     //emitNotification("Some important message", true);
     //    addMyCSS();
@@ -1223,13 +991,13 @@ jQuery(document).ready(function ($) {
     // Hide the number of fields used and distracting offer to terraform
     $('#fields').hide();
 
-    /**
-     * Testing which screen we're on in the Goalie object constructor just seems wrong //TODO: decide how terrible
-     */
-    if ($('.technology.index').length) {
-        console.log("Tech");
-        //goalie.determineRecommendation($);
-    }
+
+    var onFleets = $('#content.fleet.index').length;
+    var doingSleep = $('#SFCA_sleep').length;
+
+
+
+
 
     /**
      * Provide a single button to clear messages and logs...
@@ -1282,20 +1050,13 @@ jQuery(document).ready(function ($) {
      */
     if ($('.buildings.home.index').length) {
 
-
-        if (goalie.goalMet($)) {
-            logger.log('d', 'ready to build!!');
-        } else {
-            // capture costs for the next goal
-            goalie.getCosts($);
-        }
-
         var add;
 
         $('.row.location').each(function () {
             var loc = new Location($(this));
             if (loc.isNamed('Research Lab')) {
                 localStorage[uni + '-' + 'research_' + thePlanet] = loc.level;
+                //console.log("RESEARCH LEVEL:",loc.level);
                 localStorage[uni + '-' + 'researchUpgrade_' + thePlanet] = loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
                 var researchPosition = "#" + getResearchPosition(thePlanet);
 
@@ -1320,8 +1081,7 @@ jQuery(document).ready(function ($) {
         });
     }
 
-    var onFleets = $('#content.fleet.index').length;
-    var doingSleep = $('#SFCA_sleep').length;
+
 
     if (onFleets && (!doingSleep)) {
 
@@ -1365,6 +1125,9 @@ jQuery(document).ready(function ($) {
     if ($('#content.options.index').length) {
         insertProfileHeader($);
     }
+
+    // Get and display the current recommendation
+    var goalie=new Goalie($);
 
     //emitStatusMessage("GOAL: "+ goalie.getRecommendation($), true);
     var additionalItems = "GOAL: " + goalie.getRecommendation($);
