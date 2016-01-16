@@ -390,7 +390,6 @@ function sleepNextPlanet($) {
     } else {
         emitNotification($, "Done, have a good night!");
 
-
         var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
         localStorage[universe + '-autoSleep'] = "false";
 
@@ -449,10 +448,7 @@ function doSetupAuto($) {
     var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
     localStorage[universe + '-autoSleep'] = "true";
     var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
-    logger.log('d','Sleep tomorrow seconds='+tomorrowSecs);
-
-    // Just keep a list (the same list) of planets that need attention of the shipwright, so to do each one time only
-    localStorage[universe + '-checkCargo'] = JSON.stringify(saveState);
+    logger.log('d', 'Sleep tomorrow seconds=' + tomorrowSecs);
 
     // sleep the first planet in the list...
     sleepNextPlanet($);
@@ -472,11 +468,6 @@ function do_setupSleep(planet) {
  * When the ships tab is displayed (an ajax event), process that screen...
  */
 function displayingShips($) {
-
-    //var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
-    //localStorage[universe + '-autoSleep'] = "false";
-
-
     // If we're in auto mode, offer abort and do next, else offer setup
 
     var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
@@ -486,7 +477,6 @@ function displayingShips($) {
     if (!autosleepActive) {
         toolbarAutoSleep($, true);
     } else {
-        console.log("currently sleeping");
         toolbarAutoSleep($, false);
     }
 
@@ -530,12 +520,11 @@ function displayingShips($) {
 
     }
 
-
     // If we're not already in auto-sleep mode, and the state says we're to be performing, go sleep all... or something
     if (!autosleepActive) {
         var universe = window.location.href.split('.')[0].split('/')[2];
         var botState = localStorage[universe + '-botState']; //TODO: when this is an object, all will be well and less of a hack?
-        logger.log('d', "Not sleeping, state=" + botState);
+        logger.log('d', "Auto setup, state=" + botState);
         if (botState === "sleeping") {
             doSetupAuto($);
         }
@@ -582,23 +571,18 @@ function do_setAndSleep($) {
     do_sleepsave(sleepDist, sleepSpeed, true);
 }
 
+//TODO: doesn't work because we can't just set the botstate willy-nilly... and I didn't want to kludge one more flag
 function do_sleepAllFromFleet($) {
+    // I forget just what's going on here... some sort of bad idea?
     console.log("JUST DO IT");
 
-    /* resolve code:
-    this.setState($, 'sleeping');
-
-    // now invoke the AllPlanets function to get us to the ships overview
-    displayAllTasks('ships');
-        */
-
     console.log("HACK just do sleep all");
-    var thePlanet = gup('current_planet');
-    var activatePlanet = gup('activate_planet');
-    if (activatePlanet.length)
-        thePlanet = activatePlanet;
     var universe = window.location.href.split('.')[0].split('/')[2];
-    localStorage[universe + '-botState'] = "sleeping";
+
+    // Can't just set the bot state, because it is cleared with no matching event...
+    //localStorage[universe + '-botState'] = "sleeping";
+
+    localStorage[universe + '-autoSleep'] = 'false';
 
     // now invoke the AllPlanets function to get us to the ships overview
     displayAllTasks('ships');
@@ -658,9 +642,9 @@ function enoughCarms($, updateScreen) {
             $('.fleet_table > .fleet').html(fleetListOut);
         }
 
-        return (loaded < 80);
+        return (loaded < 85);
     } else {
-        // if no carms the fleet must be out, so don't build more just now //TODO: how do we get the first one?!
+        // if no carms the fleet must be out, so don't build more just now //TODO: how do we get the very first one?!
         return true;
     }
 }
@@ -793,31 +777,95 @@ function initSleepsave($, manual) {
         if (activatePlanet.length)
             thePlanet = activatePlanet;
 
+        // Be sure we have enough cargo, then send those ships out and sleep
+        var enough = enoughCarms($, false);
         var didShipBuilder = localStorage[this.universe + '-didShipBuilder'];
-        if (typeof didShipBuilder == 'undefined') {
-            //logger.log('d',"Checking cargo capacity...");
+
+        if (!enough && (typeof didShipBuilder == 'undefined')) {
+            // This "one time only" logic was hard to place!
             localStorage[this.universe + '-didShipBuilder'] = 'only once per planet';
 
-            var enough = enoughCarms($,false);
-            if (!enough) {
-                logger.log('d','BUILD more carms!');
+            logger.log('d', 'Must build more cargo');
 
-                // restore the cookie so we'll come back and try again, then go do the build...
-                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+            // restore the cookie so we'll come back and try again, then go do the build...
+            document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
 
-                // get some built, go to the shipyard page, the shipwright will send us back here (via fleets)...
-                localStorage[universe + '-build'] = "carmanor";
-                window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+            // get some built, go to the shipyard page, the shipwright will send us back here (via fleets)...
+            localStorage[universe + '-build'] = "carmanor";
+            window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+        } else {
+
+            // Cargo is handled, let's see about upgrading our buildings...
+            // The way this part was originally coded, we'd go on and on with tasks and screens. Instead:
+            // Do ONE thing toward the goal, and then send the fleet.
+            var goalieDone = false;
+            var activeGoalieCount = localStorage[universe + '-goalieCounter'];
+            //logger.log('d','goal loop count='+activeGoalieCount);
+            if (typeof activeGoalieCount !== 'undefined') {
+                    goalieDone = true;
             } else {
-                logger.log('d','Sufficient cargo, now sleepsave');
-                localStorage.removeItem(this.universe + '-didShipBuilder');
-                doAutoSleep($, thePlanet, targetDist, sleepSpeed);
+                activeGoalieCount = 0; //TODO: the first less-kludgy thing is to handle this as a flag not a counter
             }
 
-        } else {
-            logger.log('d','Cargo now building, do sleepsave');
-            localStorage.removeItem(this.universe + '-didShipBuilder');
-            doAutoSleep($, thePlanet, targetDist, sleepSpeed);
+            //console.log("SKIP Builder...");goalieDone = true;
+
+            var goalie = new Goalie($);
+            var theGoal = goalie.getGoal(logger);
+            var costed = goalie.goalCosted(logger);
+            var canAfford = goalie.checkResources($,logger);
+            logger.log('d','Build goal='+theGoal);
+            // We had our shot, now it's time to move on...
+            if (goalieDone) {
+                localStorage.removeItem(this.universe + '-didShipBuilder');
+                localStorage.removeItem(universe + '-goalieCounter');
+                localStorage.removeItem(universe + '-goalieActive');
+                doAutoSleep($, thePlanet, targetDist, sleepSpeed);
+            } else if (theGoal == "Undetermined") {
+                logger.log('d', 'Goal task: get new goal');
+                localStorage[universe + '-goalieActive'] = 'get a goal';
+                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+
+                // restore the cookie so we'll come back and try again, then go check Tech...
+                // TODO: the next less-kludgy thing is to make this a local storage flag not a cookie
+                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+
+                window.location.href = "/technology?current_planet=" + thePlanet;
+
+            } else if (!costed) {
+                logger.log('d', 'Goal task: get costs for goal');
+                localStorage[universe + '-goalieActive'] = 'get goal costs';
+                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+
+                // restore the cookie so we'll come back and try again, then go find the costs...
+                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+
+                window.location.href = "/buildings/home?current_planet=" + thePlanet;
+
+            } else if (canAfford) {
+                logger.log('d', 'Ready to build!');
+                localStorage[universe + '-goalieActive'] = 1;
+                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+
+                // restore the cookie so we'll come back and try again, then go start the build...
+                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+
+                window.location.href = "/buildings/home?current_planet=" + thePlanet;
+            } else if (theGoal == "UpgradeInProgress") {
+                //logger.log('d', 'Check if build is complete');
+
+                localStorage[universe + '-goalieActive'] = 1;
+                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+
+                // restore the cookie so we'll come back and try again, then go start the build...
+                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+
+                window.location.href = "/buildings/home?current_planet=" + thePlanet;
+            } else {
+                localStorage.removeItem(this.universe + '-didShipBuilder');
+                localStorage.removeItem(universe + '-goalieCounter');
+                localStorage.removeItem(universe + '-goalieActive');
+                doAutoSleep($, thePlanet, targetDist, sleepSpeed);
+            }
         }
     }
 }
@@ -873,9 +921,9 @@ function doAutoSleep($, thePlanet, targetDist, sleepSpeed) {
         if (theInterval > 9) {
             logger.log('d', 'Tomorrow, always tomorrow');
             var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
-            logger.log('d','Target secs='+tomorrowSecs);
+            logger.log('d', 'Target secs=' + tomorrowSecs);
             if (typeof tomorrowSecs === 'undefined') {
-                logger.log('w','There is no tomorrow');
+                logger.log('w', 'There is no tomorrow');
             } else {
 
                 var sleepPicks = generateSleepPicks();
@@ -928,8 +976,6 @@ function doAutoSleep($, thePlanet, targetDist, sleepSpeed) {
     //return;
 
     do_sleepsave(targetDist, sleepSpeed, false);
-
-
 }
 
 // this is injected into the page, it's NOT userscript!
@@ -1055,21 +1101,6 @@ function do_sleepsave(targetDist, sleepSpeed, manual) {
             document.getElementById('assign_button').click();
         }
     }
-}
-
-// A quick toolbar hack, for debugging... not current used                   TODO: delete it?
-function debuggerBar($) {
-    var toolbarDiv = document.createElement('div');
-    toolbarDiv.setAttribute('id', 'sleepToolbar');
-
-    toolbarDiv.innerHTML = '<a href="#">[Hack!]</a></span>';
-    $('#overview_table').before(toolbarDiv);
-
-    var setup = document.getElementById('sleepToolbar');
-    setup.addEventListener('click', function (e) {
-        doSetupAuto($);
-    }, false);
-
 }
 
 
@@ -1845,7 +1876,6 @@ function doAutoAbort($) {
 
 
 function toolbarAutoSleep($, offerSleepSetup) {
-
     var universe = window.location.href.split('.')[0].split('/')[2];
     var botState = localStorage[universe + '-botState']; //TODO: when this is an object, all will be well and less of a hack?
 
@@ -1871,14 +1901,12 @@ function toolbarAutoSleep($, offerSleepSetup) {
             logger.log('d', "DEBUG calc speed=" + result[0] + " distance=" + result[1]);
         });
 
-
     } else {
 
         // this used to be a cookie //TODO: still mostly crappy, fix it!
         var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
         var aaa = localStorage[universe + '-autoSleep'];
         var autosleepActive = (aaa === 'true');
-
 
         if (autosleepActive) {
             var theHTML = 'Auto: <span id="toolbarAuto_functions_abort"><a href="#" id="abortAuto">[Abort]</a></span>';
@@ -1891,12 +1919,56 @@ function toolbarAutoSleep($, offerSleepSetup) {
 }
 
 
+/**
+ * A building upgrade was requested and a new div was added in response. Tell the Goalie to update with the indicated
+ * status, clear the flag (we've done all we can do for now) then go back to fleets.
+ *
+ * @param $ - jQuery
+ * @param triggerElement - the new div
+ */
+function buildRequestExecuted($,triggerElement) {
+    // An example error:
+    // <span class="error_text">That does not belong to you.</span>
+    var findErr = triggerElement.html().indexOf('error_text');
+    if (findErr > -1) {
+
+        var errText = triggerElement.html().slice(findErr);
+        var part = errText.match(/>.+</g);
+        console.log("BUILD FAILED error=", part[0]);
+
+        var goalie=new Goalie($)
+        goalie.flagGoal(part[0]);
+    } else {
+        console.log('success tremendous, now go back to fleets');
+        var goalie=new Goalie($)
+        goalie.buildRequestSuccess();
+    }
+
+    // The build is done, return to fleets
+    // TODO: I don't even know how this universe/planet shit would be done elsewhere, in this case...
+    var universe = window.location.href.split('.')[0].split('/')[2];
+    var thePlanet = gup('current_planet');
+    var activatePlanet = gup('activate_planet');
+    if (activatePlanet.length)
+        thePlanet = activatePlanet;
+
+    localStorage.removeItem(universe + '-goalieActive');
+    window.location.href = "/fleet?current_planet=" + thePlanet;
+}
+
+
 /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
  *
  *             M A I N L I N E
  *
  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
 jQuery(document).ready(function ($) {
+    var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
+    var thePlanet = gup('current_planet');
+    var activatePlanet = gup('activate_planet');
+    if (activatePlanet.length)
+        thePlanet = activatePlanet;
+
     // <enabled>
     var m = myGMgetValue('enabled_Sleepsave', 'true');
     var moduleEnabled = (m === 'true');
@@ -1922,7 +1994,6 @@ jQuery(document).ready(function ($) {
     // Check for cloak
     var cloaked = false;
     var stores = new Stores();
-
     var evtCount = stores.getEventCount();
     // for every event not logically deleted, if it hasn't expired...
     for (var i = 0; i < evtCount; i++) {
@@ -1940,18 +2011,20 @@ jQuery(document).ready(function ($) {
             }
         }
     }
+    var disabled = false;
+    if (cloaked) {
+        console.log("DEBUG: sleepsave disabled, cloaked");
+        disabled = true;
+    }
 
-
-    var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
-    var thePlanet = gup('current_planet');
-    var activatePlanet = gup('activate_planet');
-    if (activatePlanet.length)
-        thePlanet = activatePlanet;
-
+    // The active goal builder overrides all else until that task is done
+    var goalieActive = localStorage[universe + '-goalieActive'];
+    if (typeof goalieActive !== 'undefined') {
+        disabled = true;
+    }
 
     // Need a way to abort automatic sleep state
-    toolbarAutoSleep($);
-
+    toolbarAutoSleep($, false);
 
     var menu = myGMgetValue('sfcaMenu_register', '');                              // TODO: WTF is this?!
     var pos = menu.search(/Fleet dispatched to harvest/);
@@ -1981,7 +2054,7 @@ jQuery(document).ready(function ($) {
      //myLog("Clock drift: " + GclockDrift);
      **/
 
-        // Watch for the ships overview
+    // Watch for the Ships overview... the Resolve object starts a sleepsave by setting flags and requesting Ships
     waitForKeyElements($, "th.ships.alt", displayingShips);
 
     // Toggle to show/hide any fleets in flight...
@@ -1997,7 +2070,7 @@ jQuery(document).ready(function ($) {
     if ($('#content.fleet.index').length) {
 
         // Display cargo load percentage
-        enoughCarms($,true);
+        enoughCarms($, true);
 
         // Wrap the table in a div for easier hide                                       //TODO:Do we really need this?
         $("#tasks").wrap("<div id='fleetWrapper' style='display:" + toggleFleetDisplay + "'></div>");
@@ -2011,7 +2084,6 @@ jQuery(document).ready(function ($) {
             var aaa = localStorage[universe + '-autoSleep'];
             var autoSleepActive = (aaa === 'true'); //TODO: we can do better than this!
 
-
             if (autoSleepActive) {
 
                 localStorage[universe + '-autoSleep'] = "false";
@@ -2020,25 +2092,21 @@ jQuery(document).ready(function ($) {
                 emitNotification($, "Aborted on error");
             }
         }
-
-
     }
 
-    // On the fleet screen, if not cloaked, do automated events...
+    // On the fleet screen, if not cloaked or busy, do automated events...
     if ($('#content.fleet.index').length) {
-        if (!cloaked) {
+        if (!disabled) {
 
             // if we got here from the ships overview, handle the request to sleepsave this fleet
             var doSleep = getCookie('set_sleep_cookie');
             if (doSleep.length) {
                 // Ready to perform an automated sleep save, but first let's see if we need more cargo...
-                logger.log('d','DO SLEEP...');
+                //logger.log('d', 'DO SLEEP...');
 
                 // do the automated sleepsave...
                 document.cookie = "set_sleep_cookie=; expires=Sun, 04 Jul 1976 00:00:00 UTC";
                 initSleepsave($, false);
-
-//                window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
 
             } else {
                 // add a button to the fleet screen to offer the feature
@@ -2074,13 +2142,76 @@ jQuery(document).ready(function ($) {
                     }
                 }
             }
-
-
         } else {
-            console.log("CLOAKED");
+            console.log("DEBUG sleepsave disabled");
         }
     }
 
+    /**
+     * Before sending the fleet out on a sleepsave, do the tasks required to find
+     * a building upgrade goal and initiate when the resources are sufficient.
+     */
+
+    // On the Tech screen, take note of the goal
+    if ($('.technology.index').length) {
+        var goalie = new Goalie($);
+        goalie.determineRecommendation($);
+
+        if (goalieActive) {
+            // we interrupted Fleet sleepsave action to get the goal, now we're done, clear flag and go back
+            localStorage.removeItem(universe + '-goalieActive');
+            window.location.href = "/fleet?current_planet=" + thePlanet;
+        }
+    }
+
+    // On the Buildings screen, get the costs for the goal or just build it when we can
+    if ($('.buildings.home.index').length) {
+
+        //console.log("TEST0 go"); goalieActive = true;
+
+        var goalie = new Goalie($);
+        var costed = goalie.goalCosted(logger);
+        if (!costed) {
+            goalie.setCosts($, logger);
+        }
+
+        var getFresh = false;
+        if (goalieActive) {
+            if (goalie.testUpgradeInProgress($, logger)) {
+                logger.log('d', 'already building an upgrade');
+            } else if (goalie.upgradeComplete(logger)) {
+                logger.log('d', 'need a fresh goal!!');
+                getFresh = true;
+            } else if (goalie.checkResources($, logger)) {
+                logger.log('d', "Ready to build!");
+
+                // SO this goes down one of three ways: the builder refuses to build, or the request fails, or it works.
+                // In every case, we need to get back to the fleets screen. Handle the first case here, and the other
+                // two will be caught when the new div is displayed after the request is executed.
+                waitForKeyElements($, ".in_progress", buildRequestExecuted);
+                waitForKeyElements($, ".error", buildRequestExecuted);
+                if (!goalie.buildTheUpgrade($, logger, thePlanet)) {
+                    // should probably clear the recommendation and try again but for the moment just block it
+                    goalie.flagGoal("could not start");
+                } else {
+                    goalieActive = false; // don't jump back from here, but instead in the key element listener
+                }
+            }
+        }
+
+        //console.log("TEST0 end"); goalieActive = false;
+
+        if (goalieActive) {
+            if (getFresh) {
+                window.location.href = "/technology?current_planet=" + thePlanet;
+
+            } else {
+                // we interrupted Fleet sleepsave action to get the goal, now we're done, clear flag and go back
+                localStorage.removeItem(universe + '-goalieActive');
+                window.location.href = "/fleet?current_planet=" + thePlanet;
+            }
+        }
+    }
 
     // Display BOJ message with version on Profile screen
     if ($('#content.options.index').length) {
@@ -2089,7 +2220,6 @@ jQuery(document).ready(function ($) {
     }
 });
 
-//console.log("BOJ Sleepsave");
 addMyCSS();
 myAttachIt(toggleModuleEnabled_Sleepsave);
 myAttachIt(do_setupSleep);
