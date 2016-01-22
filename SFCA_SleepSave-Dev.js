@@ -368,6 +368,8 @@ function fleetHasRecycler(shipList) {
 }
 
 function sleepNextPlanet($) {
+    var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
+
     // get the next planet to process, shift out the first one, mark it and sleep it, until the list is empty
     var sleepList = JSON.parse(myGMgetValue('autoSleepPlanets', '[]'));
     var sleepPlanet = sleepList.shift();
@@ -389,8 +391,9 @@ function sleepNextPlanet($) {
 
     } else {
         emitNotification($, "Done, have a good night!");
+        localStorage[universe + '-alreadyCheckedBuildComplete'] = "true";
 
-        var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
+
         localStorage[universe + '-autoSleep'] = "false";
 
         console.log("HACK botstate return from autosleep");
@@ -420,6 +423,8 @@ function markPlanetsToSave($) {
 
 // Affect a single button that will cause all fleets to save when it's time to sleep
 function doSetupAuto($) {
+    var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
+
     // Process each ship row, add a sleep button... or something :)
     var saveState = [];
     var i = 0;
@@ -436,6 +441,9 @@ function doSetupAuto($) {
             theName = $('#theirRow' + i + ' > td').children().first().next().children().first(); //TODO: really?
             var thisPlanet = [i, p, theName.html()]; // row, planet, name... should be sufficient
 
+            // Discard any old status as we're about to get a new disposition
+            localStorage.removeItem(this.universe + '-' + 'techStatus_' + thisPlanet);
+
             saveState.push(thisPlanet);
             theName.html('<i>' + theName.html() + '</i>');
         }
@@ -445,7 +453,6 @@ function doSetupAuto($) {
     logger.log('d', "sleep list=" + JSON.stringify(saveState));
     myGMsetValue('autoSleepPlanets', JSON.stringify(saveState));
 
-    var universe = window.location.href.split('.')[0].split('/')[2]; //TODO: when this is an object, all will be well and less of a hack?
     localStorage[universe + '-autoSleep'] = "true";
     var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
     logger.log('d', 'Sleep tomorrow seconds=' + tomorrowSecs);
@@ -618,14 +625,19 @@ function doBuildAndSleep($) {
 function enoughCarms($, updateScreen) {
     var logger = new Logger();
 
-    //console.log($('.fleet > .row').html());
     var carmanors = 0;
     var fleetListHTML = $('.fleet_table> .fleet').html();
     if (typeof fleetListHTML === "string") {
-        //console.log(fleetListHTML);
         var fleetList = fleetListHTML.replace(/\s/g, "");
         var carms = fleetList.match(/CarmanorClassCargo.*/);
+
         if (carms instanceof Array) {
+
+            ////** THIS IS IT ... select one of the indicated ship (for Gaia)
+            //var shipID = fleetList.match(/HermesClassProbe.*/)[0].split('_')[2];
+            //incrementWidget('ship_quantity_' + shipID, 1, 0, null);
+            //console.log("CARMS HTML:",fleetList.match(/HermesClassProbe.*/)[0].split('_')[2]);
+
             carmanors = parseInt(fleetList.match(/CarmanorClassCargo.*/)[0].split('<')[6].split('>')[1], 10);
         } else {
             console.log("no carms");
@@ -648,6 +660,34 @@ function enoughCarms($, updateScreen) {
         return true;
     }
 }
+
+// For colonization...
+/**
+ *  If we have a Gaia, select it so we can colonize...
+ *
+ *  updateScreen: display calculated result (so the "enough" test can be called multiple times, all logic on one place)
+ **/
+function haveGaia($) {
+    var logger = new Logger();
+
+    var fleetListHTML = $('.fleet_table> .fleet').html();
+    if (typeof fleetListHTML === "string") {
+        var fleetList = fleetListHTML.replace(/\s/g, "");
+        var findGaia = fleetList.match(/GaiaClassColonyShip.*/);
+        if (findGaia instanceof Array) {
+            console.log("found a Gaia, let's send it!");
+
+            var shipID = fleetList.match(/GaiaClassColonyShip.*/)[0].split('_')[2];
+            incrementWidget('ship_quantity_' + shipID, 1, 0, null);
+
+            //console.log("GAIA HTML:",fleetList.match(/HermesClassProbe.*/)[0].split('_')[2]);
+        } else {
+            console.log("no Gaia");
+        }
+    }
+}
+
+
 
 // Incomplete, and now I'm not even sure what I was thinking...
 function calculateDurationFromInterval($, interval) {
@@ -809,10 +849,19 @@ function initSleepsave($, manual) {
 
             //console.log("SKIP Builder...");goalieDone = true;
 
+            // TODO: this can be much better, easily
+            var skipUpgradeDoneCheck = false;
+            var justSkipIt = localStorage[universe + '-alreadyCheckedBuildComplete'];
+            if (typeof justSkipIt !== 'undefined') {
+                skipUpgradeDoneCheck = true;
+            }
+
+
             var goalie = new Goalie($);
             var theGoal = goalie.getGoal(logger);
-            var costed = goalie.goalCosted(logger);
+            var costed = goalie.goalCosted($, logger);
             var canAfford = goalie.checkResources($,logger);
+
             logger.log('d','Build goal='+theGoal);
             // We had our shot, now it's time to move on...
             if (goalieDone) {
@@ -850,7 +899,7 @@ function initSleepsave($, manual) {
                 document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
 
                 window.location.href = "/buildings/home?current_planet=" + thePlanet;
-            } else if (theGoal == "UpgradeInProgress") {
+            } else if (theGoal == "UpgradeInProgress" && !skipUpgradeDoneCheck) {
                 //logger.log('d', 'Check if build is complete');
 
                 localStorage[universe + '-goalieActive'] = 1;
@@ -880,6 +929,14 @@ function initSleepsave($, manual) {
  */
 function doAutoSleep($, thePlanet, targetDist, sleepSpeed) {
     var logger = new Logger();
+    var universe = window.location.href.split('.')[0].split('/')[2];  //TODO: when this is an object, all will be well and less of a hack?
+
+    // Be sure to save some sort of status... it will likely either be in-process, or a building cost.
+    var goalStatus = localStorage[universe + '-' + 'tech_' + thePlanet];
+    localStorage[universe + '-' + 'techStatus_' + thePlanet] = goalStatus;
+    // Now the point of this part, update the status with the unmet resource totals
+    var goalie = new Goalie($);
+    goalie.checkResources($,logger);
 
     logger.log('d', ">> Autosleep " + thePlanet);
 
@@ -900,7 +957,7 @@ function doAutoSleep($, thePlanet, targetDist, sleepSpeed) {
     sleepFlag.innerHTML = 'SFCA sleep flag';
     $('#current_planet_type').after(sleepFlag);
 
-    var universe = window.location.href.split('.')[0].split('/')[2];  //TODO: when this is an object, all will be well and less of a hack?
+
     var interval = localStorage[universe + '-fleetInterval'];
     if (typeof interval === 'undefined') {
         logger.log('w', 'WARN: no interval, must punt');
@@ -1952,8 +2009,21 @@ function buildRequestExecuted($,triggerElement) {
     if (activatePlanet.length)
         thePlanet = activatePlanet;
 
+    // Start in with the primordial grow mode...
+    var growing = false;
+    var growFlag = localStorage[universe + '-growMode'];
+    if (typeof growFlag !== 'undefined') {
+        console.log("GROWING");
+        growing = true;
+    }
+
     localStorage.removeItem(universe + '-goalieActive');
-    window.location.href = "/fleet?current_planet=" + thePlanet;
+    if (growing) {
+        //window.location.href = "/fleet?current_planet=" + thePlanet;
+        console.log("Growing, stay on build...");
+    } else {
+        window.location.href = "/fleet?current_planet=" + thePlanet;
+    }
 }
 
 
@@ -2071,6 +2141,7 @@ jQuery(document).ready(function ($) {
 
         // Display cargo load percentage
         enoughCarms($, true);
+        haveGaia($);
 
         // Wrap the table in a div for easier hide                                       //TODO:Do we really need this?
         $("#tasks").wrap("<div id='fleetWrapper' style='display:" + toggleFleetDisplay + "'></div>");
@@ -2147,11 +2218,19 @@ jQuery(document).ready(function ($) {
         }
     }
 
+    // TODO: Simplify!
+    var growing = false;
+    // The active goal builder overrides all else until that task is done
+    var growFlag = localStorage[universe + '-growMode'];
+    if (typeof growFlag !== 'undefined') {
+        console.log("GROWING");
+        growing = true;
+    }
+
     /**
      * Before sending the fleet out on a sleepsave, do the tasks required to find
      * a building upgrade goal and initiate when the resources are sufficient.
      */
-
     // On the Tech screen, take note of the goal
     if ($('.technology.index').length) {
         var goalie = new Goalie($);
@@ -2162,6 +2241,11 @@ jQuery(document).ready(function ($) {
             localStorage.removeItem(universe + '-goalieActive');
             window.location.href = "/fleet?current_planet=" + thePlanet;
         }
+
+        if (growing) {
+            logger.log('d','grow by building new goal');
+            window.location.href = "/buildings/home?current_planet=" + thePlanet;
+        }
     }
 
     // On the Buildings screen, get the costs for the goal or just build it when we can
@@ -2170,13 +2254,16 @@ jQuery(document).ready(function ($) {
         //console.log("TEST0 go"); goalieActive = true;
 
         var goalie = new Goalie($);
-        var costed = goalie.goalCosted(logger);
+        var costed = goalie.goalCosted($, logger);
         if (!costed) {
             goalie.setCosts($, logger);
         }
 
+        // Always check available resources and calculate any shortage
+        goalie.checkResources($, logger);
+
         var getFresh = false;
-        if (goalieActive) {
+        if (goalieActive || growing) {
             if (goalie.testUpgradeInProgress($, logger)) {
                 logger.log('d', 'already building an upgrade');
             } else if (goalie.upgradeComplete(logger)) {
@@ -2201,14 +2288,18 @@ jQuery(document).ready(function ($) {
 
         //console.log("TEST0 end"); goalieActive = false;
 
-        if (goalieActive) {
+        if (goalieActive || growing) {
             if (getFresh) {
                 window.location.href = "/technology?current_planet=" + thePlanet;
 
             } else {
-                // we interrupted Fleet sleepsave action to get the goal, now we're done, clear flag and go back
-                localStorage.removeItem(universe + '-goalieActive');
-                window.location.href = "/fleet?current_planet=" + thePlanet;
+                if (growing) {
+                    console.log("Stay right here...");
+                } else {
+                    // we interrupted Fleet sleepsave action to get the goal, now we're done, clear flag and go back
+                    localStorage.removeItem(universe + '-goalieActive');
+                    window.location.href = "/fleet?current_planet=" + thePlanet;
+                }
             }
         }
     }
