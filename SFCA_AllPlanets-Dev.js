@@ -18,6 +18,7 @@
 //   from Home > All Planets.
 // * Provides the toolbar for Starfleet Commander Advantage; this script must be installed
 //   to provide the foundation for the other SFCA scripts.
+// * Experimental: replace their menu with ours, custom built for SFCA
 //
 //
 // KNOWN ISSUES
@@ -118,6 +119,22 @@ function myAttachIt(theFunction) {
  *
  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
 // Display a nice status or error message box
+function emitStatusMessage(message, bGold) {
+
+    // CSS NEEDS HELP!
+
+    var messageBox = document.createElement("div");
+    if (bGold)
+        messageBox.setAttribute('class', 'myStatusBox');
+    else
+        messageBox.setAttribute('class', 'myLessFancyStatusBox');
+    messageBox.innerHTML = message;
+    //var nav=document.getElementById("sticky_notices");
+    var nav = document.getElementById("user_planets");
+    nav.parentNode.insert(messageBox, nav.nextSibling);
+}
+
+// Display a nice status or error message box
 function emitNotification($, quickLink) {
     var messageBox = document.createElement("div");
     messageBox.setAttribute('class','notice');
@@ -195,10 +212,159 @@ Starfleet Commander Advantage -  All Planets \
 (version ' + GM_info.script.version + '): ' + active);
 }
 
+function showTop() {
+    // having injected style CSS the only way to alter it is to inject more :( //TODO: research another way?
+
+    var myCSS = "";
+    // Before StyleBot it was pretty simple:
+    myCSS += '#resources_table {';
+    myCSS += '    display: block;';
+    myCSS += '}';
+
+    myCSS += 'div.navigation_bar {';
+    myCSS += '    display: block;';
+    myCSS += '}';
+
+    myCSS += '#planet_sub_nav {';
+    myCSS += '    display: block;';
+    myCSS += '}';
+
+    // Stylebot demands a bit more:
+    //myCSS += 'div.resources.starfleet.eradeon {';
+    myCSS += '#resources_table.starfleet {';
+    myCSS += '    display: block !important;';
+    myCSS += '}';
+
+    myCSS += 'div.navigation_bar {';
+    myCSS += '    display: block !important;';
+    myCSS += '}';
+
+    // For overriding StyleBot
+    myCSS += '#the_nav_bar {';
+    myCSS += '    display: block !important;';
+    myCSS += '}';
+
+    //myCSS += 'div.sub_nav {';
+    myCSS += 'div#planet_sub_nav.sub_nav {';
+    myCSS += '    display: block !important;';
+    myCSS += '}';
+
+    myCSS += ".myLessFancyStatusBox {";
+    myCSS += '    display: none;';
+    myCSS += '}';
+
+    addGlobalStyle(myCSS);
+
+}
+
+function hideTop() {
+    // using CSS not $().hide() so to affect the screen before document ready
+
+    var myCSS = "";
+    //myCSS += 'div.resources.starfleet.eradeon {';
+    myCSS += '#resources_table {';
+    myCSS += '    display: none;';
+    myCSS += '}';
+
+    myCSS += 'div.navigation_bar {';
+    myCSS += '    display: none;';
+    myCSS += '}';
+
+    myCSS += '#planet_sub_nav {';
+    myCSS += '    display: none;';
+    myCSS += '}';
+
+    addGlobalStyle(myCSS);
+
+}
+
+
+function menuInit() {
+    var menu = localStorage['SFCA_menu'];
+    if (typeof menu == "undefined") {
+        localStorage['SFCA_menu'] = 'off';
+        menu = 'off';
+    }
+
+// If we're showing ours, hide theirs
+    if (menu === 'on') {
+        hideTop();
+    } else {
+        /**
+         * In the dev lab we use StyleBot to suppress their top menu, so ours shows with no flicker.
+         * In this case we have to force it to show up even as StyleBot hides it.
+         *
+         * In someone else's production environment without StyleBot the following does nothing,
+         * and when our menu is shown there is a little bit of flicker. Nothing more to do about it...
+         */
+        // Must add an id for greater specificity for our force...
+        var x = document.getElementsByClassName("navigation_bar");
+        x[0].setAttribute("id", "the_nav_bar");
+        showTop();
+    }
+
+}
+
+function menuDisplay($, thePlanet, additionalItems) {
+    var menuToggle = localStorage['SFCA_menu'];
+    if (menuToggle == "on") {
+        //var myMenu='<a id="buttonToggleMenus">[Full Menu]</a> <a href="/fleet?current_planet='+thePlanet+'">[Fleet]</a>';
+        var myMenu = '<a id="buttonToggleMenus">[Full Menu]</a> <a id="buttonGoBuildings">[Buildings]</a> <a id="buttonGoFleet">[Fleet]</a> <a id="buttonGoShipyard">[Shipyard]</a>' +
+            ' <a id="buttonBuild">[Build]</a>';
+        myMenu += '<br /><br />' + additionalItems;
+        emitStatusMessage(myMenu, false);
+        $('#buttonToggleMenus').click(function () {
+            localStorage['SFCA_menu'] = 'off';
+            var x = document.getElementsByClassName("navigation_bar");
+            x[0].setAttribute("id", "the_nav_bar");
+            showTop();
+        });
+        $('#buttonGoBuildings').click(function () {
+            window.location.href = "/buildings/home?current_planet=" + thePlanet;
+        });
+        $('#buttonGoFleet').click(function () {
+            window.location.href = "/fleet?current_planet=" + thePlanet;
+        });
+        $('#buttonGoShipyard').click(function () {
+            window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+        });
+        $('#buttonBuild').click(function () {
+            console.log("build");
+
+            $('#build_amount_2073344062').val(40); // one is fine for the test button...
+
+            disable_ajax_links();
+
+            //new Ajax.Request('/buildings/shipyard/build/950199677?current_planet=' + thePlanet,
+            //    {asynchronous:true, evalScripts:true, parameters:Form.Element.serialize('build_amount_950199677')});
+
+
+            new Ajax.Request('/buildings/shipyard/build/2073344062?current_planet=' + thePlanet,
+                {asynchronous: true, evalScripts: true, parameters: Form.Element.serialize('build_amount_2073344062')});
+            console.log("built");
+
+        });
+
+
+    } else {
+        emitStatusMessage(additionalItems, true);
+    }
+
+
+    var ourButton = $('<span />').attr('class', 'nav_item').html('<a id="buttonSFCA">SFCA</a>');
+    ourButton.prependTo('#planet_sub_nav');
+    $('#buttonSFCA').click(function () {
+        localStorage['SFCA_menu'] = 'on';
+
+        console.log("TRY HARDER");
+        location.reload();
+    });
+}
+
 
 function addMyCSS() {
     // Status messages...
-    myCSS = ".myLessFancyStatusBox {";
+    var myCSS = ".myLessFancyStatusBox {";
     myCSS += "color: white;";
     myCSS += "background-image:url(/images/starfleet/layout/transparent_grey_bg.png);";
     myCSS += "border:1px solid #006C82;";
@@ -241,9 +407,16 @@ function myGMgetValue(param, def) {
  *
  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
 jQuery( document ).ready(function( $ ) {
+    var thePlanet = gup('current_planet');
+    var activatePlanet = gup('activate_planet');
+    if (activatePlanet.length)
+        thePlanet = activatePlanet;
+    var uni = window.location.href.split('.')[0].split('/')[2];
 
+
+    // Much ado about enablement, in the original version people would want to carefully turn modules on and off...
     var m = myGMgetValue('enabled_AllPlanets','true');
-    moduleEnabled=(m ==='true');
+    var moduleEnabled=(m ==='true');
 
     var doToggle = getCookie('toggleModuleEnabled');
     if (doToggle === 'toggle') {
@@ -257,11 +430,14 @@ jQuery( document ).ready(function( $ ) {
         }
     }
 
+    /**
+     * This has no value...
     var displayEnabled='DISABLED';
     if (moduleEnabled)
         displayEnabled='enabled';
     var myVersion = GM_info.script.version;
-    //console.log ('AllPlanets ver', myVersion, displayEnabled);
+    console.log ('AllPlanets ver', myVersion, displayEnabled);
+     */
 
     /***
      * When the All Planets overview is displayed, if we got here from a click on our toolbar, switch to the appropriate tab.
@@ -283,13 +459,40 @@ jQuery( document ).ready(function( $ ) {
         }
     }
 
-
     // Display BOJ message with version on Profile screen
     if ( $('#content.options.index').length ) {
         insertProfileHeader($,moduleEnabled);
     } else {
         addMyToolbar($,moduleEnabled);
     }
+
+    // Primordial indeed, this button is going to be the key to developing the early planet auto-builder...
+    var goalie = new Goalie($);
+    var growLinks = '';
+    if (goalie.isPrimordial()) {
+        if (typeof localStorage[uni + '-growMode'] !== "undefined") {
+            growLinks = '<a style="color: #5eff00;" href="#" id="noGrowButton">[No Grow!]</a> ';
+        } else {
+            growLinks = '<a style="color: #5eff00;" href="#" id="growButton">[Grow!]</a> ';
+        }
+    }
+
+    // Our menu... I should finish it, for now just display the status (and grow option)
+    var additionalItems = '<div class="growth">' +
+        growLinks +
+        localStorage[uni + '-' + 'techStatus_' + thePlanet] + '</div>';
+    menuDisplay($, thePlanet, additionalItems);
+
+    // The button!!
+    $('#growButton').click(function () {
+        console.log("Must grow!!");
+        localStorage[uni + '-growMode'] = 'grow';
+    });
+    $('#noGrowButton').click(function () {
+        console.log("Enough with the grow!!");
+        localStorage.removeItem(uni + '-growMode');
+    });
+
 });
 
 //console.log("BOJ AllPlanets");
@@ -297,3 +500,6 @@ addMyCSS();
 myAttachIt(displayAllTasks);
 myAttachIt(toggleModuleEnabled);
 myAttachIt(gup);
+
+// If we're showing ours, hide theirs
+menuInit();
