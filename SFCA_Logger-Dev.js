@@ -345,6 +345,23 @@ Location.prototype = {
     }
 };
 
+// http://www.jacklmoore.com/notes/rounding-in-javascript/
+function round(value, decimals) {
+    return Number(Math.round(value+'e'+decimals)+'e-'+decimals);
+}
+
+function scaledAndRounded(value) {
+    if (value === 0) {
+        return 0;
+    } else if (value > 1000000) {
+        return round(value / 1000000, 2) + "M";
+    } else if (value > 100000) {
+        return round (value / 1000, 0) + "K";
+    } else {
+        return value;
+    }
+}
+
 
 function Goalie($) {
     this.universe = window.location.href.split('.')[0].split('/')[2];
@@ -359,42 +376,32 @@ function Goalie($) {
         this.recommendation = "Undetermined";
     }
 
-
-    /** Might still want something like this?
-
-     this.costedRecommendation = "none";
-     if (this.recommendation === costRecommendation) {
-        this.costedRecommendation = this.recommendation + ' (ore:' + shortOre + ' crystal:' + shortCrystal + ' hydrogen:' + shortHydro + ')';
-        if (shortOre + shortCrystal + shortHydro == 0) {
-            // if we are on the tech screen, confirmed good target and sufficient resources, do it!
-            if ($('.technology.index').length) {
-                this.costedRecommendation = this.recommendation + " - Build!";
-                this.setGoalMet($);
-            } else {
-                // probably fine, but let's reconfirm (need to see the current build target to be sure)
-                if (!this.goalMet($)) {
-                    this.costedRecommendation = this.recommendation + " - Ready?";
-                } else {
-                    this.costedRecommendation = this.recommendation + " - Build it!";
-
-                }
-            }
-        } else {
-            this.costedRecommendation = this.recommendation + ' (ore:' + shortOre + ' crystal:' + shortCrystal + ' hydrogen:' + shortHydro + ')';
-        }
-    } else {
-        this.costedRecommendation = this.recommendation + " (" + this.costedRecommendation + ")";
-    }
-     */
+    // A new universe will be known by the home planet not renamed (and with no moon, didn't test that part)
+    this.primordial = ( $(".home_planet div.planet div.name_and_coords div.planet_name").html() === "Stew");
 }
+
 
 Goalie.prototype = {
     constructor: Goalie,
+    isPrimordial: function() {
+        return this.primordial;
+    },
     // Called when the Tech screen is served, parse and save the recommended next upgrade to build.
     determineRecommendation: function ($) {
         var logger = new Logger(this.universe);
 
         var recommendedBuild = $('.recommendations').html().split('>')[3].split('<')[0];
+
+        // For those universes where things are well developed...
+        if (recommendedBuild === "Hydrogen Synthesizer" && !this.primordial) {
+            console.log("We don't need the gas");
+            recommendedBuild = "Ore Mine";
+        }
+        if (recommendedBuild === "Solar Array" && !this.primordial) {
+            console.log("Burn the gas");
+            recommendedBuild = "Nuclear Power Plant";
+        }
+
         localStorage[this.universe + '-' + 'tech_' + this.planet] = recommendedBuild;
         this.recommendation = recommendedBuild;
         logger.log('d', 'Next goal: ' + recommendedBuild);
@@ -437,21 +444,28 @@ Goalie.prototype = {
 
         // An invalid build target should be impossible, but since the effects are pretty bad if it happens... be sure
         var foundTarget = false;
-
+        var theRecommendation = rec + '/' + 'INVALID!';
         $('.row.location').each(function () {
             var loc = new Location($(this));
             if (loc.isNamed(rec)) {
-                logger.log('d', "FOUND COSTS " + rec + '/' + loc.oCost + '/' + loc.cCost + '/' + loc.hCost);
-                localStorage[thisUniverse + '-' + 'tech_' + thisPlanet] = rec + '/' + loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
                 foundTarget = true;
+                theRecommendation = rec + '/' + loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
+                logger.log('d', "FOUND COSTS: " + theRecommendation);
                 return false;
             }
         });
-        if (!foundTarget) {
-            localStorage[thisUniverse + '-' + 'tech_' + thisPlanet] = rec + '/' + 'INVALID!';
-        }
+        this.recommendation = theRecommendation;
+        localStorage[thisUniverse + '-' + 'tech_' + thisPlanet] = theRecommendation;
     },
-    goalCosted: function (logger) {
+    goalCosted: function ($, logger) {
+        if ($('.buildings.home.index').length) {
+            // Handle the case where we manually started a build... if something is building now there are no costs,
+            // instead update the goal to indicate the current activity.
+            if (this.testUpgradeInProgress($, logger)) {
+                this.recommendation = 'UpgradeInProgress';
+                localStorage[this.universe + '-' + 'tech_' + this.planet] = this.recommendation;
+            }
+        }
         // If there's a build in process, nothing more is required for costs
         if (this.recommendation === 'UpgradeInProgress') {
             return true;
@@ -479,6 +493,10 @@ Goalie.prototype = {
             logger.log('d','full fields!');
             return false;
         }
+        if (costRecommendation[1] == "INVALID!") {
+            localStorage[this.universe + '-' + 'techStatus_' + this.planet] = "Invalid goal: " + costRecommendation[0];
+            return false;
+        }
         if (costRecommendation.length > 1) {
             logger.log('d','costs computed for '+ costRecommendation);
             var upgradeOre = this.recommendation.split('/')[1];
@@ -503,7 +521,19 @@ Goalie.prototype = {
             (shortHydro < 0) ? shortHydro *= -1 : shortHydro = 0;
 
             this.haveResources = ((shortOre == 0) && (shortCrystal == 0) && (shortHydro == 0));
-            logger.log('d','have all=' + this.haveResources + ' short ore=' + shortOre + ' c=' + shortCrystal + 'h=' + shortHydro);
+            logger.log('d','have all=' + this.haveResources + ' short ore=' + shortOre + ' c=' + shortCrystal + ' h=' + shortHydro);
+
+            // Make a note of what we need to get the upgrade started...
+            var bldg = this.recommendation.split('/')[0];
+            if (this.haveResources) {
+                localStorage[this.universe + '-' + 'techStatus_' + this.planet] = bldg + ": Ready!";
+            } else {
+
+                localStorage[this.universe + '-' + 'techStatus_' + this.planet] = bldg + ": " +
+                    scaledAndRounded(shortOre) +
+                    "/" + scaledAndRounded(shortCrystal) +
+                    "/" + scaledAndRounded(shortHydro);
+            }
 
             return this.haveResources;
 
@@ -532,6 +562,8 @@ Goalie.prototype = {
         var upgrade = upgradeDiv.replace(/\s+/g, ''); // strip whitespace
         if (upgrade.length) {
             logger.log('d', 'upgrade in progress');
+            // Reset "recommendation" status to indicate the current upgrade
+            localStorage[this.universe + '-' + 'techStatus_' + this.planet] = "Upgrading...";
             return true;
         } else {
             logger.log('d', 'upgrade idle');
@@ -571,10 +603,6 @@ Goalie.prototype = {
             logger.log('e', 'upgrade request surely failed, building=' + bldg);
         }
         return upgradeWasRequested;
-    },
-    // This one is probably wrong...
-    getRecommendation: function ($) {
-        return this.recommendation;
     },
     flagGoal: function (reason) {
         var recommendedBuild = "FAILED/flagged/" + reason;
