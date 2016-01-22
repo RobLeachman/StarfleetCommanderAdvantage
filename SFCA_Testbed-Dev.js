@@ -363,51 +363,6 @@ function hideTop() {
 
 }
 
-function showTop() {
-    // having injected style CSS the only way to alter it is to inject more :( //TODO: research another way?
-
-    var myCSS = "";
-    // Before StyleBot it was pretty simple:
-    myCSS += '#resources_table {';
-    myCSS += '    display: block;';
-    myCSS += '}';
-
-    myCSS += 'div.navigation_bar {';
-    myCSS += '    display: block;';
-    myCSS += '}';
-
-    myCSS += '#planet_sub_nav {';
-    myCSS += '    display: block;';
-    myCSS += '}';
-
-    // Stylebot demands a bit more:
-    //myCSS += 'div.resources.starfleet.eradeon {';
-    myCSS += '#resources_table.starfleet {';
-    myCSS += '    display: block !important;';
-    myCSS += '}';
-
-    myCSS += 'div.navigation_bar {';
-    myCSS += '    display: block !important;';
-    myCSS += '}';
-
-    // For overriding StyleBot
-    myCSS += '#the_nav_bar {';
-    myCSS += '    display: block !important;';
-    myCSS += '}';
-
-    //myCSS += 'div.sub_nav {';
-    myCSS += 'div#planet_sub_nav.sub_nav {';
-    myCSS += '    display: block !important;';
-    myCSS += '}';
-
-    myCSS += ".myLessFancyStatusBox {";
-    myCSS += '    display: none;';
-    myCSS += '}';
-
-    addGlobalStyle(myCSS);
-
-}
-
 
 // Display BOJ message on Profile screen
 function insertProfileHeader($) {
@@ -521,9 +476,37 @@ function displayingMines($, tasks) {
     console.log("GOT MINES");
 }
 
+/**
+ * Display any pending upgrade.
+ *
+ * @param $
+ * @param tasks
+ */
 function displayingTasks($, tasks) {
-    console.log("GOT TASKS");
+    var universe = window.location.href.split('.')[0].split('/')[2];
+
+    var i = -1;
+    $('#overview_table > table > tbody  > tr').each(function () {
+        if (i > -1) {
+            $this = $(this);
+            var theirRow = 'theirRow' + i;
+            this.setAttribute('id', theirRow);
+
+            var planetNumber = stripCoordsFromPlanetRow($, $this);
+
+            var taskList = $this.children('td').first().next();
+
+            var theirHTML = taskList.html();
+            var taskStatus = localStorage[universe + '-' + 'techStatus_' + planetNumber];
+            if (typeof taskStatus == "undefined" || taskStatus === "UpgradeInProgress") {
+                taskStatus = " ";
+            }
+            taskList.html('<span style="color:yellow">' + taskStatus + '</span>' + theirHTML);
+        }
+        i++;
+    });
 }
+
 function displayingDefenses($, tasks) {
     console.log("GOT DEFENSES");
 }
@@ -730,90 +713,6 @@ function getResearchPosition(planet) {
         j++;
     }
     return '?';
-}
-
-function menuInit() {
-    var menu = localStorage['SFCA_menu'];
-    if (typeof menu == "undefined") {
-        localStorage['SFCA_menu'] = 'off';
-        menu = 'off';
-    }
-
-// If we're showing ours, hide theirs
-    if (menu === 'on') {
-        hideTop();
-    } else {
-        /**
-         * In the dev lab we use StyleBot to suppress their top menu, so ours shows with no flicker.
-         * In this case we have to force it to show up even as StyleBot hides it.
-         *
-         * In someone else's production environment without StyleBot the following does nothing,
-         * and when our menu is shown there is a little bit of flicker. Nothing more to do about it...
-         */
-        // Must add an id for greater specificity for our force...
-        var x = document.getElementsByClassName("navigation_bar");
-        x[0].setAttribute("id", "the_nav_bar");
-        showTop();
-    }
-
-}
-
-function menuDisplay($, thePlanet, additionalItems) {
-    var menuToggle = localStorage['SFCA_menu'];
-    if (menuToggle == "on") {
-        //var myMenu='<a id="buttonToggleMenus">[Full Menu]</a> <a href="/fleet?current_planet='+thePlanet+'">[Fleet]</a>';
-        var myMenu = '<a id="buttonToggleMenus">[Full Menu]</a> <a id="buttonGoBuildings">[Buildings]</a> <a id="buttonGoFleet">[Fleet]</a> <a id="buttonGoShipyard">[Shipyard]</a>' +
-            ' <a id="buttonBuild">[Build]</a>';
-        myMenu += '<br /><br />' + additionalItems;
-        emitStatusMessage(myMenu, false);
-        $('#buttonToggleMenus').click(function () {
-            localStorage['SFCA_menu'] = 'off';
-            var x = document.getElementsByClassName("navigation_bar");
-            x[0].setAttribute("id", "the_nav_bar");
-            showTop();
-        });
-        $('#buttonGoBuildings').click(function () {
-            window.location.href = "/buildings/home?current_planet=" + thePlanet;
-        });
-        $('#buttonGoFleet').click(function () {
-            window.location.href = "/fleet?current_planet=" + thePlanet;
-        });
-        $('#buttonGoShipyard').click(function () {
-            window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
-        });
-        $('#buttonBuild').click(function () {
-            console.log("build");
-
-            $('#build_amount_2073344062').val(40); // one is fine for the test button...
-
-            disable_ajax_links();
-
-            //new Ajax.Request('/buildings/shipyard/build/950199677?current_planet=' + thePlanet,
-            //    {asynchronous:true, evalScripts:true, parameters:Form.Element.serialize('build_amount_950199677')});
-
-
-            new Ajax.Request('/buildings/shipyard/build/2073344062?current_planet=' + thePlanet,
-                {asynchronous: true, evalScripts: true, parameters: Form.Element.serialize('build_amount_2073344062')});
-            console.log("built");
-
-        });
-
-
-    } else {
-        emitStatusMessage(additionalItems, true);
-    }
-
-
-    var ourButton = $('<span />').attr('class', 'nav_item').html('<a id="buttonSFCA">SFCA</a>');
-    ourButton.prependTo('#planet_sub_nav');
-    $('#buttonSFCA').click(function () {
-        localStorage['SFCA_menu'] = 'on';
-
-        console.log("TRY HARDER");
-        location.reload();
-    });
-
-
 }
 
 
@@ -1077,7 +976,6 @@ jQuery(document).ready(function ($) {
 
 
     if (onFleets && (!doingSleep)) {
-
         var coords = $('.target_planet');
         if (coords.length) {
 
@@ -1109,25 +1007,15 @@ jQuery(document).ready(function ($) {
                 '<a class="left_button" href="#" onclick="incrementWidget(\'' + 'planet' + '\', -1, 0, null); return false;"><img alt=">" src="/images/starfleet/layout/left_arrow.png?1439250916"></a>' +
                 part[3] +
                 '<a class="right_button" href="#" onclick="incrementWidget(\'' + 'planet' + '\', 1, 0, null); return false;"><img alt=">" src="/images/starfleet/layout/right_arrow.png?1439250916"></a>' +
-                part[4]);
-
+                part[4] + part[5]);
         }
     }
+
 
     // Display BOJ message on Profile screen
     if ($('#content.options.index').length) {
         insertProfileHeader($);
     }
-
-    // Get and display the current recommendation
-    var goalie = new Goalie($);
-
-    //emitStatusMessage("GOAL: "+ goalie.getRecommendation($), true);
-    var additionalItems = "GOAL: " + goalie.getRecommendation($);
-
-    // <Our menu>
-    menuDisplay($, thePlanet, additionalItems);
-
 
     /*
      var m = myGMgetValue('sfca_menu', 'false');
@@ -1184,14 +1072,12 @@ jQuery(document).ready(function ($) {
 
      */
 
-
 });
 
 //console.log("BOJ Testbed");
 addMyCSS_testbed();
 
-// If we're showing ours, hide theirs
-menuInit();
+
 
 
 /* ADD A NOTE... need to iterate each row, and $this=$(this) doesn't translate well if using noConflict workaround with assigning a new variable name to replace the $ alias.
