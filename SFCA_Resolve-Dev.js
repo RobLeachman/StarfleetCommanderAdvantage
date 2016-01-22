@@ -289,6 +289,7 @@ function do_purgeState($) {
     //var logger = new Logger(universe);
     //logger.purge();
 
+    localStorage.removeItem(universe + '-alreadyCheckedBuildComplete');
 }
 
 function do_addAdHoc($, theTimer) {
@@ -526,6 +527,7 @@ Resolve.prototype = {
         //console.log("Resolve BOJ");
     },
     getState: function ($) {
+        //console.log("BOT STATE: uni=" + this.universe + " state=" + localStorage[this.universe + '-botState']);
         return localStorage[this.universe + '-botState'];
     },
     setState: function ($, newState) {
