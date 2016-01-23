@@ -836,27 +836,18 @@ function initSleepsave($, manual) {
         } else {
 
             // Cargo is handled, let's see about upgrading our buildings...
-            // The way this part was originally coded, we'd go on and on with tasks and screens. Instead:
-            // Do ONE thing toward the goal, and then send the fleet.
-            var goalieDone = false;
-            var activeGoalieCount = localStorage[universe + '-goalieCounter'];
-            //logger.log('d','goal loop count='+activeGoalieCount);
-            if (typeof activeGoalieCount !== 'undefined') {
-                    goalieDone = true;
-            } else {
-                activeGoalieCount = 0; //TODO: the first less-kludgy thing is to handle this as a flag not a counter
-            }
 
-            //console.log("SKIP Builder...");goalieDone = true;
-
+            //console.log("SKIP Builder...");localStorage[universe + '-goalieCounter'] = 'debugger-skip builder';
             var goalie = new Goalie($);
             var theGoal = goalie.getGoal(logger);
             var costed = goalie.goalCosted($, logger);
             var canAfford = goalie.checkResources($,logger);
 
             logger.log('d','Build goal='+theGoal);
-            // We had our shot, now it's time to move on...
-            if (goalieDone) {
+
+            // The way this part was originally coded, we'd go on and on with tasks and screens. Instead:
+            // Do ONE thing toward the goal, and then send the fleet.
+            if (typeof localStorage[universe + '-goalieCounter'] !== 'undefined') {
                 localStorage.removeItem(this.universe + '-didShipBuilder');
                 localStorage.removeItem(universe + '-goalieCounter');
                 localStorage.removeItem(universe + '-goalieActive');
@@ -864,7 +855,7 @@ function initSleepsave($, manual) {
             } else if (theGoal == "Undetermined") {
                 logger.log('d', 'Goal task: get new goal');
                 localStorage[universe + '-goalieActive'] = 'get a goal';
-                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+                localStorage[universe + '-goalieCounter'] = 'did goalie';
 
                 // restore the cookie so we'll come back and try again, then go check Tech...
                 // TODO: the next less-kludgy thing is to make this a local storage flag not a cookie
@@ -875,7 +866,7 @@ function initSleepsave($, manual) {
             } else if (!costed) {
                 logger.log('d', 'Goal task: get costs for goal');
                 localStorage[universe + '-goalieActive'] = 'get goal costs';
-                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+                localStorage[universe + '-goalieCounter'] = 'did goalie';
 
                 // restore the cookie so we'll come back and try again, then go find the costs...
                 document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
@@ -885,7 +876,7 @@ function initSleepsave($, manual) {
             } else if (canAfford) {
                 logger.log('d', 'Ready to build!');
                 localStorage[universe + '-goalieActive'] = 1;
-                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+                localStorage[universe + '-goalieCounter'] = 'did goalie';
 
                 // restore the cookie so we'll come back and try again, then go start the build...
                 document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
@@ -896,7 +887,7 @@ function initSleepsave($, manual) {
                 logger.log('d', 'Check if build is complete');
 
                 localStorage[universe + '-goalieActive'] = 1;
-                localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
+                localStorage[universe + '-goalieCounter'] = 'did goalie';
 
                 // restore the cookie so we'll come back and try again, then go start the build...
                 document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
