@@ -849,14 +849,6 @@ function initSleepsave($, manual) {
 
             //console.log("SKIP Builder...");goalieDone = true;
 
-            // TODO: this can be much better, easily
-            var skipUpgradeDoneCheck = false;
-            var justSkipIt = localStorage[universe + '-alreadyCheckedBuildComplete'];
-            if (typeof justSkipIt !== 'undefined') {
-                skipUpgradeDoneCheck = true;
-            }
-
-
             var goalie = new Goalie($);
             var theGoal = goalie.getGoal(logger);
             var costed = goalie.goalCosted($, logger);
@@ -899,8 +891,9 @@ function initSleepsave($, manual) {
                 document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
 
                 window.location.href = "/buildings/home?current_planet=" + thePlanet;
-            } else if (theGoal == "UpgradeInProgress" && !skipUpgradeDoneCheck) {
-                //logger.log('d', 'Check if build is complete');
+            } else if (theGoal == "UpgradeInProgress" &&
+                typeof localStorage[universe + '-alreadyCheckedBuildComplete'] === 'undefined') {
+                logger.log('d', 'Check if build is complete');
 
                 localStorage[universe + '-goalieActive'] = 1;
                 localStorage[universe + '-goalieCounter'] = ++activeGoalieCount;
