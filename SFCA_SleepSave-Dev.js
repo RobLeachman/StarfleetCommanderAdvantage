@@ -748,6 +748,13 @@ function calculateDurationFromInterval($, interval) {
 
 function initSleepsave($, manual) {
     var logger = new Logger();
+    //TODO: when SleepSave is refactored as an object, we won't need to do this...
+    var universe = window.location.href.split('.')[0].split('/')[2];
+    var thePlanet = gup('current_planet');
+    var activatePlanet = gup('activate_planet');
+    if (activatePlanet.length)
+        thePlanet = activatePlanet;
+
     var fleetListHTML = $('.fleet_table> .fleet').html();
     if (typeof fleetListHTML !== "string" && !manual) {
         logger.log('e', "No ships!");
@@ -810,78 +817,67 @@ function initSleepsave($, manual) {
 
 
     } else {
-        //TODO: when SleepSave is refactored as an object, we won't need to do this...
-        var universe = window.location.href.split('.')[0].split('/')[2];
-        var thePlanet = gup('current_planet');
-        var activatePlanet = gup('activate_planet');
-        if (activatePlanet.length)
-            thePlanet = activatePlanet;
+        var goalie = new Goalie($);
+        var theGoal = goalie.getGoal(logger);
+        var costed = goalie.goalCosted($, logger);
+        var canAfford = goalie.checkResources($,logger);
+        //console.log("SKIP Builder...");localStorage[universe + '-goalieCounter'] = 'debugger-skip builder';
 
         // Be sure we have enough cargo, then send those ships out and sleep
         var enough = enoughCarms($, false);
-        var didShipBuilder = localStorage[this.universe + '-didShipBuilder'];
 
-        if (!enough && (typeof didShipBuilder == 'undefined')) {
-            // This "one time only" logic was hard to place!
+        var nextScreen = "";
+
+        if (!enough && (typeof localStorage[this.universe + '-didShipBuilder'] == 'undefined')) {
             localStorage[this.universe + '-didShipBuilder'] = 'only once per planet';
-
-            logger.log('d', 'Must build more cargo');
-
-            // restore the cookie so we'll come back and try again, then go do the build...
-            document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
-
             // get some built, go to the shipyard page, the shipwright will send us back here (via fleets)...
+            logger.log('d', 'Must build more cargo............................');
             localStorage[universe + '-build'] = "carmanor";
-            window.location.href = "/buildings/shipyard?current_planet=" + thePlanet;
+
+            nextScreen = "/buildings/shipyard?current_planet=" + thePlanet;
         } else {
 
             // Cargo is handled, let's see about upgrading our buildings...
 
-            //console.log("SKIP Builder...");localStorage[universe + '-goalieCounter'] = 'debugger-skip builder';
+/*
             var goalie = new Goalie($);
             var theGoal = goalie.getGoal(logger);
             var costed = goalie.goalCosted($, logger);
             var canAfford = goalie.checkResources($,logger);
+            //console.log("SKIP Builder...");localStorage[universe + '-goalieCounter'] = 'debugger-skip builder';
+*/
 
             logger.log('d','Build goal='+theGoal);
 
             // The way this part was originally coded, we'd go on and on with tasks and screens. Instead:
             // Do ONE thing toward the goal, and then send the fleet.
             if (typeof localStorage[universe + '-goalieCounter'] !== 'undefined') {
+                logger.log('d','DEBUG: loop max!!!!!');
+                /*
                 localStorage.removeItem(this.universe + '-didShipBuilder');
                 localStorage.removeItem(universe + '-goalieCounter');
                 localStorage.removeItem(universe + '-goalieActive');
                 doAutoSleep($, thePlanet, targetDist, sleepSpeed);
+                */
             } else if (theGoal == "Undetermined") {
                 logger.log('d', 'Goal task: get new goal');
                 localStorage[universe + '-goalieActive'] = 'get a goal';
                 localStorage[universe + '-goalieCounter'] = 'did goalie';
 
-                // restore the cookie so we'll come back and try again, then go check Tech...
-                // TODO: the next less-kludgy thing is to make this a local storage flag not a cookie
-                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
-
-                window.location.href = "/technology?current_planet=" + thePlanet;
+                nextScreen = "/technology?current_planet=" + thePlanet;
 
             } else if (!costed) {
                 logger.log('d', 'Goal task: get costs for goal');
                 localStorage[universe + '-goalieActive'] = 'get goal costs';
                 localStorage[universe + '-goalieCounter'] = 'did goalie';
 
-                // restore the cookie so we'll come back and try again, then go find the costs...
-                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
-
-                window.location.href = "/buildings/home?current_planet=" + thePlanet;
-
+                nextScreen = "/buildings/home?current_planet=" + thePlanet;
             } else if (canAfford) {
                 logger.log('d', 'Ready to build!');
                 localStorage[universe + '-goalieActive'] = 1;
                 localStorage[universe + '-goalieCounter'] = 'did goalie';
 
-                // restore the cookie so we'll come back and try again, then go start the build...
-                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
-
-                window.location.href = "/buildings/home?current_planet=" + thePlanet;
+                nextScreen = "/buildings/home?current_planet=" + thePlanet;
             } else if (theGoal == "UpgradeInProgress" &&
                 typeof localStorage[universe + '-alreadyCheckedBuildComplete'] === 'undefined') {
                 logger.log('d', 'Check if build is complete');
@@ -889,16 +885,19 @@ function initSleepsave($, manual) {
                 localStorage[universe + '-goalieActive'] = 1;
                 localStorage[universe + '-goalieCounter'] = 'did goalie';
 
-                // restore the cookie so we'll come back and try again, then go start the build...
-                document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
-
-                window.location.href = "/buildings/home?current_planet=" + thePlanet;
-            } else {
-                localStorage.removeItem(this.universe + '-didShipBuilder');
-                localStorage.removeItem(universe + '-goalieCounter');
-                localStorage.removeItem(universe + '-goalieActive');
-                doAutoSleep($, thePlanet, targetDist, sleepSpeed);
+                nextScreen = "/buildings/home?current_planet=" + thePlanet;
             }
+        }
+        if (nextScreen != "") {
+            // TODO: the next less-kludgy thing is to make this a local storage flag not a cookie
+            // restore the cookie so we'll come back and try again, then go do the build...
+            document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
+            window.location.href = nextScreen;
+        } else {
+            localStorage.removeItem(this.universe + '-didShipBuilder');
+            localStorage.removeItem(universe + '-goalieCounter');
+            localStorage.removeItem(universe + '-goalieActive');
+            doAutoSleep($, thePlanet, targetDist, sleepSpeed);
         }
     }
 }
