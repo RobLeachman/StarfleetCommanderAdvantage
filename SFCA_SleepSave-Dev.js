@@ -688,7 +688,6 @@ function haveGaia($) {
 }
 
 
-
 // Incomplete, and now I'm not even sure what I was thinking...
 function calculateDurationFromInterval($, interval) {
     var logger = new Logger();
@@ -820,81 +819,67 @@ function initSleepsave($, manual) {
         var goalie = new Goalie($);
         var theGoal = goalie.getGoal(logger);
         var costed = goalie.goalCosted($, logger);
-        var canAfford = goalie.checkResources($,logger);
+        var canAfford = goalie.checkResources($, logger);
         //console.log("SKIP Builder...");localStorage[universe + '-goalieCounter'] = 'debugger-skip builder';
 
-        // Be sure we have enough cargo, then send those ships out and sleep
+        // Be sure we have enough cargo
         var enough = enoughCarms($, false);
 
         var nextScreen = "";
 
-        if (!enough && (typeof localStorage[this.universe + '-didShipBuilder'] == 'undefined')) {
-            localStorage[this.universe + '-didShipBuilder'] = 'only once per planet';
+        logger.log('d', 'Build goal=' + theGoal);
+
+        // The way this part was originally coded, we'd go on and on with tasks and screens. Instead:
+        // Do ONE thing toward the goal, and then send the fleet.
+        if (typeof localStorage[universe + '-goalieCounter'] !== 'undefined') {
+            logger.log('d', 'DEBUG: loop max!!!!!');
+        } else if (theGoal == "Undetermined") {
+            logger.log('d', 'Goal task: get new goal');
+            localStorage[universe + '-goalieActive'] = 'get a goal';
+            localStorage[universe + '-goalieCounter'] = 'did goalie';
+
+            nextScreen = "/technology?current_planet=" + thePlanet;
+
+        } else if (!costed) {
+            logger.log('d', 'Goal task: get costs for goal');
+            localStorage[universe + '-goalieActive'] = 'get goal costs';
+            localStorage[universe + '-goalieCounter'] = 'did goalie';
+
+            nextScreen = "/buildings/home?current_planet=" + thePlanet;
+        } else if (canAfford) {
+            logger.log('d', 'Ready to build!');
+            localStorage[universe + '-goalieActive'] = 1;
+            localStorage[universe + '-goalieCounter'] = 'did goalie';
+
+            nextScreen = "/buildings/home?current_planet=" + thePlanet;
+        } else if (theGoal == "UpgradeInProgress" &&
+            typeof localStorage[universe + '-alreadyCheckedBuildComplete'] === 'undefined') {
+            logger.log('d', 'Check if build is complete');
+
+            localStorage[universe + '-goalieActive'] = 1;
+            localStorage[universe + '-goalieCounter'] = 'did goalie';
+
+            nextScreen = "/buildings/home?current_planet=" + thePlanet;
+        }
+
+        // When all builder actions are done, if we still have insufficient cargo, get some built
+        if (nextScreen == "" && !enough && (typeof localStorage[universe + '-didShipBuilder'] == 'undefined')) {
+            localStorage[universe + '-didShipBuilder'] = 'only once per planet';
             // get some built, go to the shipyard page, the shipwright will send us back here (via fleets)...
             logger.log('d', 'Must build more cargo............................');
             localStorage[universe + '-build'] = "carmanor";
 
             nextScreen = "/buildings/shipyard?current_planet=" + thePlanet;
-        } else {
-
-            // Cargo is handled, let's see about upgrading our buildings...
-
-/*
-            var goalie = new Goalie($);
-            var theGoal = goalie.getGoal(logger);
-            var costed = goalie.goalCosted($, logger);
-            var canAfford = goalie.checkResources($,logger);
-            //console.log("SKIP Builder...");localStorage[universe + '-goalieCounter'] = 'debugger-skip builder';
-*/
-
-            logger.log('d','Build goal='+theGoal);
-
-            // The way this part was originally coded, we'd go on and on with tasks and screens. Instead:
-            // Do ONE thing toward the goal, and then send the fleet.
-            if (typeof localStorage[universe + '-goalieCounter'] !== 'undefined') {
-                logger.log('d','DEBUG: loop max!!!!!');
-                /*
-                localStorage.removeItem(this.universe + '-didShipBuilder');
-                localStorage.removeItem(universe + '-goalieCounter');
-                localStorage.removeItem(universe + '-goalieActive');
-                doAutoSleep($, thePlanet, targetDist, sleepSpeed);
-                */
-            } else if (theGoal == "Undetermined") {
-                logger.log('d', 'Goal task: get new goal');
-                localStorage[universe + '-goalieActive'] = 'get a goal';
-                localStorage[universe + '-goalieCounter'] = 'did goalie';
-
-                nextScreen = "/technology?current_planet=" + thePlanet;
-
-            } else if (!costed) {
-                logger.log('d', 'Goal task: get costs for goal');
-                localStorage[universe + '-goalieActive'] = 'get goal costs';
-                localStorage[universe + '-goalieCounter'] = 'did goalie';
-
-                nextScreen = "/buildings/home?current_planet=" + thePlanet;
-            } else if (canAfford) {
-                logger.log('d', 'Ready to build!');
-                localStorage[universe + '-goalieActive'] = 1;
-                localStorage[universe + '-goalieCounter'] = 'did goalie';
-
-                nextScreen = "/buildings/home?current_planet=" + thePlanet;
-            } else if (theGoal == "UpgradeInProgress" &&
-                typeof localStorage[universe + '-alreadyCheckedBuildComplete'] === 'undefined') {
-                logger.log('d', 'Check if build is complete');
-
-                localStorage[universe + '-goalieActive'] = 1;
-                localStorage[universe + '-goalieCounter'] = 'did goalie';
-
-                nextScreen = "/buildings/home?current_planet=" + thePlanet;
-            }
         }
+
+
         if (nextScreen != "") {
             // TODO: the next less-kludgy thing is to make this a local storage flag not a cookie
             // restore the cookie so we'll come back and try again, then go do the build...
             document.cookie = 'set_sleep_cookie=crappyCookieIsSet;path=/';
             window.location.href = nextScreen;
         } else {
-            localStorage.removeItem(this.universe + '-didShipBuilder');
+            localStorage.removeItem(universe + '-didShipBuilder');
             localStorage.removeItem(universe + '-goalieCounter');
             localStorage.removeItem(universe + '-goalieActive');
             doAutoSleep($, thePlanet, targetDist, sleepSpeed);
@@ -919,7 +904,7 @@ function doAutoSleep($, thePlanet, targetDist, sleepSpeed) {
     localStorage[universe + '-' + 'techStatus_' + thePlanet] = goalStatus;
     // Now the point of this part, update the status with the unmet resource totals
     var goalie = new Goalie($);
-    goalie.checkResources($,logger);
+    goalie.checkResources($, logger);
 
     logger.log('d', ">> Autosleep " + thePlanet);
 
@@ -1966,7 +1951,7 @@ function toolbarAutoSleep($, offerSleepSetup) {
  * @param $ - jQuery
  * @param triggerElement - the new div
  */
-function buildRequestExecuted($,triggerElement) {
+function buildRequestExecuted($, triggerElement) {
     // An example error:
     // <span class="error_text">That does not belong to you.</span>
     var findErr = triggerElement.html().indexOf('error_text');
@@ -1976,11 +1961,11 @@ function buildRequestExecuted($,triggerElement) {
         var part = errText.match(/>.+</g);
         console.log("BUILD FAILED error=", part[0]);
 
-        var goalie=new Goalie($)
+        var goalie = new Goalie($)
         goalie.flagGoal(part[0]);
     } else {
         console.log('success tremendous, now go back to fleets');
-        var goalie=new Goalie($)
+        var goalie = new Goalie($)
         goalie.buildRequestSuccess();
     }
 
@@ -2107,7 +2092,7 @@ jQuery(document).ready(function ($) {
      //myLog("Clock drift: " + GclockDrift);
      **/
 
-    // Watch for the Ships overview... the Resolve object starts a sleepsave by setting flags and requesting Ships
+        // Watch for the Ships overview... the Resolve object starts a sleepsave by setting flags and requesting Ships
     waitForKeyElements($, "th.ships.alt", displayingShips);
 
     // Toggle to show/hide any fleets in flight...
@@ -2226,7 +2211,7 @@ jQuery(document).ready(function ($) {
         }
 
         if (growing) {
-            logger.log('d','grow by building new goal');
+            logger.log('d', 'grow by building new goal');
             window.location.href = "/buildings/home?current_planet=" + thePlanet;
         }
     }
