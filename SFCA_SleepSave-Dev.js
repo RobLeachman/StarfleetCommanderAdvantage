@@ -1954,6 +1954,7 @@ function toolbarAutoSleep($, offerSleepSetup) {
 function buildRequestExecuted($, triggerElement) {
     // An example error:
     // <span class="error_text">That does not belong to you.</span>
+
     var findErr = triggerElement.html().indexOf('error_text');
     if (findErr > -1) {
 
@@ -1989,6 +1990,18 @@ function buildRequestExecuted($, triggerElement) {
     if (growing) {
         //window.location.href = "/fleet?current_planet=" + thePlanet;
         console.log("Growing, stay on build...");
+
+        // Immediately complete anything that can be finished for free
+        var freeSpeedup = triggerElement.html().split('/')[3].split('?')[0];
+        var cost = $('#speedup_' + freeSpeedup + '_cost').html();
+        if (cost == "FREE") {
+            new Ajax.Request('/store/confirm_speedup/' + freeSpeedup + '?current_planet=' + thePlanet +
+                    '&amp;ref_action=build&amp;ref_controller=home',
+                {
+                    asynchronous: true,
+                    evalScripts: true,
+                });
+        }
     } else {
         window.location.href = "/fleet?current_planet=" + thePlanet;
     }
