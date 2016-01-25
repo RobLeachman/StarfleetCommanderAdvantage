@@ -920,9 +920,12 @@ jQuery(document).ready(function ($) {
 
         if (wright.getBuildState() === 'carmanor') {
             if (!wright.builderQueued($)) {
-                logger.log('d', "Can build...");
+                logger.log('d', "Shipwright begins building cargo...");
+
+                //console.log("DEBUG: building probes not carms...");
                 //wright.buildShip($, 'Hermes Class Probe', 1); // for debugging, build something quick...
                 wright.buildShip($, 'Carmanor Class Cargo', 30);
+
             } else {
                 logger.log('d', "Already building...");
                 wright.buildError($, null, true);
@@ -972,6 +975,22 @@ jQuery(document).ready(function ($) {
 
             }
         });
+    }
+
+    // A start on automatic management of small planet disposal...
+    // Doesn't work as well as I'd hoped, needs a "just do it" button
+    if ($('.profile.index').length) {
+        console.log("On home screen...");
+        // Idle planets tagged as trash should go to the bin...
+        if ($('#planet_title').html() === "Trash" && $( "div:contains('Nothing is happening')").length) {
+            console.log("Junk this thing");
+            var coords = $('#planet_coords').html().split('[')[1].split(']')[0].replace(/:/g, ".");
+            window.location.href = "/profile/abandon?current_planet=" + thePlanet +
+                "&amp;planet_coords=" + coords + "&amp;ref_action=index&amp;ref_controller=profile";
+
+
+
+        }
     }
 
 
