@@ -396,6 +396,8 @@ function Resolve($, mainline) {
     var watching = false;
     var running = false;
     var foundSunset = false;
+    var foundSunrise = false;
+    var foundTomorrow = false;
     this.hyperactive = false;
     var foundShadow = false; //TODO: the others aren't object properties but just state variables like this one
 
@@ -430,17 +432,33 @@ function Resolve($, mainline) {
                     }
 
                     if (evt[4] == "Tomorrow") {
-                        // the event end is when it expires, or in this case it's when our fleets need to come in after //TODO: hardly clear to even me as I type it...
+                        // the event end is when it expires, or in this case it points to the start of a new day
                         localStorage[this.universe + '-secondsUntilTomorrow'] = eEnd;
+                        foundTomorrow = true;
                     }
                     if (evt[4] == "Sunset") {
                         foundSunset = true;
+                    }
+                    if (evt[4] == "Sunrise") {
+                        foundSunrise = true;
                     }
 
                     if (evt[4] == "Hyper")
                         this.hyperactive = true;
 
                 }
+            }
+        }
+
+        // At the start of the day, compute start of the next day and today's end as required
+        if (foundSunrise && !foundTomorrow) {
+            logger.log('i', "Found the sunrise and must calc tomorrow");
+            localStorage.removeItem(this.universe + '-fleetInterval');
+            this.addTimerEvent($, 'tomorrow');
+            if (!foundSunset) {
+                logger.log('d', "There was no sunset so adding that too");
+                this.addTimerEvent($, 'sunset');
+                foundSunset = true;
             }
         }
 
@@ -457,8 +475,12 @@ function Resolve($, mainline) {
             if (foundSunset) {
                 console.log("The sun is shining");
             } else {
-                console.log("The sun is down, we need to sleep now until tomorrow...");
+                logger.log('d',"The sun is down, we need to sleep now until tomorrow...");
                 localStorage[this.universe + '-fleetInterval'] = 99;
+                if (!foundSunrise) {
+                    logger.log('d',"Adding sunrise event");
+                    this.addTimerEvent($, 'sunrise');
+                }
             }
             //console.log("Keeping your ships alive...");
             // If there's no watcher on duty, make a new one...
@@ -538,25 +560,13 @@ Resolve.prototype = {
             //this.addTimerEvent($, '5:00,cloak');
         } else if (newState === "run") {
             console.log("  Not running, let's start!");
-            this.addTimerEvent($, '18:00:00,run');
-            //this.addTimerEvent($, '1:00:00,sunset');
+            this.addTimerEvent($, '48:00:00,run'); // barring another idea, run for the next two days
             this.addTimerEvent($, 'shadow');
+            this.addTimerEvent($, 'sunset'); // auto-calculates to end-of-day
+            this.addTimerEvent($, 'tomorrow'); // auto-calculates to tomorrow morning
+
             logger.log('d', "NEW WATCHER: setstate=run");
-            //this.addTimerEvent($, 'watch');
-            //this.addTimerEvent($, 'sunset');
-
-            /*
-             var d = new Date();
-             d.setHours(23,30,0,0);
-             logger.log('d','Goof date:' + d);
-             var myDate = new Date();
-             var now = myDate.getTime();
-             logger.log('d','Now  date:'+myDate);
-             */
-
             this.addTimerEvent($, '18:00:00,watch');
-            this.addTimerEvent($, '18:00:00,sunset');
-
 
         } else if (newState === "cloak") { //unused
             console.log("  Cloak up!");
@@ -636,8 +646,10 @@ Resolve.prototype = {
     offerAdHocTimer: function ($) {
         var adhocDiv = document.createElement("div");
         adhocDiv.setAttribute("class", "description");
-        adhocDiv.innerHTML = '<div id="ad-hoc-pastebox">Ad-hoc event: <input id="adhocPasteBox"' +
-            'size=30 value="1:00,tomorrow,sunset=1:00;tomorrow=6:00">&nbsp;<input id="adHocBtn" type="submit" value="Add event"><br>&nbsp<br></div>';
+        adhocDiv.innerHTML = '<div id="ad-hoc-pastebox">Ad-hoc event: <input id="adhocPasteBox" size=30 ' +
+            //'value="1:00,tomorrow,sunset=1:00;tomorrow=6:00"' +
+            'value="tomorrow"' +
+            '>&nbsp;<input id="adHocBtn" type="submit" value="Add event"><br>&nbsp<br></div>';
         $('#fleets_span').before(adhocDiv);
 
         $('#adHocBtn').on("click", function () {
@@ -690,6 +702,7 @@ Resolve.prototype = {
         var missionOrigin = "<i>Chonky!</i>";
         var missionInfo = "";
         var viewGal, viewSys, viewPlanet, viewTarget;
+        var justNow = new Date();
 
         var fleetStart, fleetEnd;
 
@@ -733,10 +746,15 @@ Resolve.prototype = {
 
                         //var checkType = thisTypeCol.match(timerRegEx)); //TODO: dupe code!
 
-                        var thisType = thisTypeCol.split('>')[1].split('<')[0];
-                        if (!(thisType === "Harvest" || thisType === "Espionage" || thisType === "Transport" || thisType === "Attack")) {
-                            firstRow = $(this);
-                            return false;
+                        var type1 = thisTypeCol.split('>')[1];
+                        // Might be "Espionage" and nothing else... or:
+                        //<td class="mission_type">Attack</td>
+                        if (typeof type1 !== "undefined") { // Loop past any attacker events
+                            var thisType = thisTypeCol.split('>')[1].split('<')[0];
+                            if (!(thisType === "Harvest" || thisType === "Espionage" || thisType === "Transport" || thisType === "Attack")) {
+                                firstRow = $(this);
+                                return false;
+                            }
                         }
                     }
                 });
@@ -842,38 +860,46 @@ Resolve.prototype = {
                 missionDest = "Waiting " + localStorage[this.universe + '-fleetInterval'];
                 console.log("The bot is watching for your imminent, delayed return to the game...");
             } else if (decode[0] === 'sunset') {
-                // WRONG WRONG WRONG TODO: what's better? Not sure when we want sunset but probably not here...
-
-                //var firstTimer = $('#tasks > tbody > tr').first().next().html();
-                var lastTimer = $('#tasks > tbody > tr').last().html();
-
-                try {
-                    var lastTime = String(lastTimer.match(timerRegEx)); //TODO: dupe code!
-                    //console.log("TIMER DATA: " + timerData);
-                    fleetStart = parseInt(lastTime.split(',')[1], 10);
-                    fleetEnd = parseInt(lastTime.split(',')[2], 10);
-                } catch (err) {
-                    logger.log('w', "No timer (no fleets?) for sunset");
-
-                    fleetStart = 0;
-                    fleetEnd = 120;
-                }
+                var bedtime = new Date();
+                bedtime.setHours(22,00,0,0); // the day ends at 10:00PM, or 22:00
 
                 myTime = this.clockNow;
-                myStart = fleetStart;
-                myEnd = fleetEnd;
-                console.log("** Are you a bot?");
-                //myEnd = fleetEnd + 60;
-
-                // </wrong>
-
+                myStart = 0;
+                myEnd = (bedtime.getTime() - justNow.getTime())/1000;
 
                 callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
                 missionType = "Sunset";
                 missionInfo = "It will be dark soon";
                 missionDest = "The night";
                 console.log("No vampires here");
+            } else if (decode[0] === 'sunrise') {
+                var tomorrowSunrise = new Date();
+                tomorrowSunrise.setDate(tomorrowSunrise.getDate()+1);
+                tomorrowSunrise.setHours(8,30,0,0); // the day starts at 8:30AM
 
+                myTime = this.clockNow;
+                myStart = 0;
+                myEnd = (tomorrowSunrise.getTime() - justNow.getTime())/1000;
+
+                callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
+                missionType = "Sunrise";
+                missionInfo = "The sun is warm";
+                missionDest = "Warm sun";
+            } else if (decode[0] === 'tomorrow') {
+                var tomorrowMorning = new Date();
+                tomorrowMorning.setDate(tomorrowMorning.getDate()+1);
+                tomorrowMorning.setHours(7,0,0,0); // the day starts at 7:00AM
+                //var secondsRemainingInTheDay = (bedtime.getTime() - justNow.getTime())/1000;
+
+                myTime = this.clockNow;
+                myStart = 0;
+                myEnd = (tomorrowMorning.getTime() - justNow.getTime())/1000;
+
+                callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
+                missionType = "Tomorrow";
+                missionInfo = "Tomorrow is now";
+                missionDest = "The future";
+                console.log("Today's troubles are sufficient");
             } else {
                 // do nothing but create a new timer...
                 newTime = this.getAdHocTime(adhoc);
@@ -1536,7 +1562,11 @@ jQuery(document).ready(function ($) {
     if ($('#content.options.index').length) {
         r.insertProfileHeader($);
     }
-    if ($('#content.fleet.index').length) {
+
+    var onFleets = $('#content.fleet.index').length;
+
+    if (onFleets) {
+        console.log("RESOLVE fleets");
         var haveFleets = $('#fleets_span');
         if (haveFleets.length === 0) {
             r.emitEntire($, '');
@@ -1545,6 +1575,47 @@ jQuery(document).ready(function ($) {
         r.timerToolbar($);
         r.emitEvents($);
     }
+
+    var primordial = ( $(".home_planet div.planet div.name_and_coords div.planet_name").html() === "Stew");
+
+    // Not on fleets or state=off (so nothing being saved), and not primordial...
+    // TODO: code the "oh you forgot" logic for state=off...
+    if (!primordial && (!onFleets)) {
+    //if (!primordial && (!onFleets || localStorage[window.location.href.split('.')[0].split('/')[2] + '-botState'] == "off")) {
+        var bar = $('img[alt="Top_bar_starfleet"]');
+        bar.hide();
+
+        var fuse = document.createElement("div");
+        fuse.setAttribute('class', 'fuseTimer');
+        var fuseBar = '';
+        var fuseLen = 2;
+        for (j = 0; j < fuseLen; j++) {
+            fuseBar += '-------';
+        }
+        fuse.innerHTML = '<div id="timerFuse" style="color:deepskyblue;clear:left;">' + fuseBar + '<div>';
+        $(fuse).appendTo('.topbar');
+
+        setInterval(myTimer, 5000);
+    }
+
+    function myTimer() {
+        fuseLen--;
+        if (fuseLen > 0) {
+            fuseBar = '-';
+            for (j = 0; j < fuseLen; j++) {
+                fuseBar += '-------';
+            }
+
+            document.getElementById("timerFuse").innerHTML = fuseBar;
+        } else {
+            document.getElementById("timerFuse").innerHTML = "-";
+            //do_purgeState();
+            window.location.href = "/fleet";
+        }
+
+
+    }
+
 });
 
 //console.log("BOJ Testbed");
