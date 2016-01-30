@@ -205,23 +205,6 @@ function getCookie(cname) {
     return "";
 }
 
-// Extend the base function to provide separation between the differnet versions...
-function myGMsetValue(param, value) {
-    var uni = window.location.href.split('.')[0].split('/')[2];
-    //console.log('Setting '+uni+'-'+param+'='+value);
-    GM_setValue(uni + '-' + param, value);
-}
-
-function myGMgetValue(param, def) {
-    var uni = window.location.href.split('.')[0].split('/')[2];
-    var needDefault = "NoSuchValueStoredHere";
-    //console.log('fetching '+uni+'-'+param);
-    var val = GM_getValue(uni + '-' + param, needDefault);
-    if (val == needDefault)
-        return def;
-    else
-        return val;
-}
 
 function addMyCSS() {
     // Status messages...
@@ -299,78 +282,12 @@ function do_addAdHoc($, theTimer) {
     r.emitTimerFleetRow($, newEvent);
 }
 
-
-// http://wiki.greasespot.net/XPath_Helper
-function $x() {
-    var x = '';
-    var node = document;
-    var type = 0;
-    var fix = true;
-    var i = 0;
-    var cur;
-
-    function toArray(xp) {
-        var final = [], next;
-        while (next = xp.iterateNext()) {
-            final.push(next);
-        }
-        return final;
-    }
-
-    while (cur = arguments[i++]) {
-        switch (typeof cur) {
-            case "string":
-                x += (x == '') ? cur : " | " + cur;
-                continue;
-            case "number":
-                type = cur;
-                continue;
-            case "object":
-                node = cur;
-                continue;
-            case "boolean":
-                fix = cur;
-                continue;
-        }
-    }
-
-    if (fix) {
-        if (type == 6) type = 4;
-        if (type == 7) type = 5;
-    }
-
-    // selection mistake helper
-    if (!/^\//.test(x)) x = "//" + x;
-
-    // context mistake helper
-    if (node != document && !/^\./.test(x)) x = "." + x;
-
-    var result = document.evaluate(x, node, null, type, null);
-    if (fix) {
-        // automatically return special type
-        switch (type) {
-            case 1:
-                return result.numberValue;
-            case 2:
-                return result.stringValue;
-            case 3:
-                return result.booleanValue;
-            case 8:
-            case 9:
-                return result.singleNodeValue;
-        }
-    }
-
-    return fix ? toArray(result) : result;
-}
-
-
 function Resolve($, mainline) {
     // Where are we?
     this.universe = window.location.href.split('.')[0].split('/')[2];
     var logger = new Logger(this.universe);
-    currentPlanet = this.gup('current_planet');
-    activatePlanet = this.gup('activate_planet');
+    var currentPlanet = this.gup('current_planet');
+    var activatePlanet = this.gup('activate_planet');
     if (activatePlanet)
         this.nextPlanet = activatePlanet;
     else
@@ -475,10 +392,10 @@ function Resolve($, mainline) {
             if (foundSunset) {
                 console.log("The sun is shining");
             } else {
-                logger.log('d',"The sun is down, we need to sleep now until tomorrow...");
+                logger.log('d', "The sun is down, we need to sleep now until tomorrow...");
                 localStorage[this.universe + '-fleetInterval'] = 99;
                 if (!foundSunrise) {
-                    logger.log('d',"Adding sunrise event");
+                    logger.log('d', "Adding sunrise event");
                     this.addTimerEvent($, 'sunrise');
                 }
             }
@@ -647,7 +564,7 @@ Resolve.prototype = {
         var adhocDiv = document.createElement("div");
         adhocDiv.setAttribute("class", "description");
         adhocDiv.innerHTML = '<div id="ad-hoc-pastebox">Ad-hoc event: <input id="adhocPasteBox" size=30 ' +
-            //'value="1:00,tomorrow,sunset=1:00;tomorrow=6:00"' +
+                //'value="1:00,tomorrow,sunset=1:00;tomorrow=6:00"' +
             'value="tomorrow"' +
             '>&nbsp;<input id="adHocBtn" type="submit" value="Add event"><br>&nbsp<br></div>';
         $('#fleets_span').before(adhocDiv);
@@ -861,11 +778,11 @@ Resolve.prototype = {
                 console.log("The bot is watching for your imminent, delayed return to the game...");
             } else if (decode[0] === 'sunset') {
                 var bedtime = new Date();
-                bedtime.setHours(23,15,0,0); // the day ends at 10:00PM, or 22:00
+                bedtime.setHours(23, 15, 0, 0); // the day ends at 10:00PM, or 22:00
 
                 myTime = this.clockNow;
                 myStart = 0;
-                myEnd = (bedtime.getTime() - justNow.getTime())/1000;
+                myEnd = (bedtime.getTime() - justNow.getTime()) / 1000;
 
                 callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
                 missionType = "Sunset";
@@ -874,12 +791,12 @@ Resolve.prototype = {
                 console.log("No vampires here");
             } else if (decode[0] === 'sunrise') {
                 var tomorrowSunrise = new Date();
-                tomorrowSunrise.setDate(tomorrowSunrise.getDate()+1);
-                tomorrowSunrise.setHours(5,00,0,0); // the sunrise (next day) timer fires at 5:00AM, is fine
+                tomorrowSunrise.setDate(tomorrowSunrise.getDate() + 1);
+                tomorrowSunrise.setHours(5, 0, 0, 0); // the sunrise (next day) timer fires at 5:00AM, is fine
 
                 myTime = this.clockNow;
                 myStart = 0;
-                myEnd = (tomorrowSunrise.getTime() - justNow.getTime())/1000;
+                myEnd = (tomorrowSunrise.getTime() - justNow.getTime()) / 1000;
 
                 callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
                 missionType = "Sunrise";
@@ -887,13 +804,13 @@ Resolve.prototype = {
                 missionDest = "Warm sun";
             } else if (decode[0] === 'tomorrow') {
                 var tomorrowMorning = new Date();
-                tomorrowMorning.setDate(tomorrowMorning.getDate()+1);
-                tomorrowMorning.setHours(7,0,0,0); // the day starts at 7:00AM
+                tomorrowMorning.setDate(tomorrowMorning.getDate() + 1);
+                tomorrowMorning.setHours(7, 0, 0, 0); // the day starts at 7:00AM
                 //var secondsRemainingInTheDay = (bedtime.getTime() - justNow.getTime())/1000;
 
                 myTime = this.clockNow;
                 myStart = 0;
-                myEnd = (tomorrowMorning.getTime() - justNow.getTime())/1000;
+                myEnd = (tomorrowMorning.getTime() - justNow.getTime()) / 1000;
 
                 callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
                 missionType = "Tomorrow";
@@ -1157,10 +1074,7 @@ Resolve.prototype = {
             }
  *********           */
         }
-
-        console.log("DEBUGGER saveTimedEvent");
-        var evtCount = this.saveTimedEvent($, myTime, myStart, myEnd, callback, missionType, missionDest, missionOrigin, missionInfo);
-        return evtCount;
+        return this.saveTimedEvent($, myTime, myStart, myEnd, callback, missionType, missionDest, missionOrigin, missionInfo);
     },
     /**
      * Given new event specifics, adds to store and returns the new event number.
@@ -1266,9 +1180,9 @@ Resolve.prototype = {
 
         //console.log("DEBUG emit row: type=" + missionType);
         // Now we can calculate the timer stats and actually emit the event
-        elapsed = parseInt(this.clockNow - myTime, 10);
-        calcStart = (elapsed + myStart);
-        calcEnd = myEnd - elapsed;
+        var elapsed = parseInt(this.clockNow - myTime, 10);
+        var calcStart = (elapsed + myStart);
+        var calcEnd = myEnd - elapsed;
         //myLog("Emit timer: start=" + calcStart + " end=" + calcEnd);
         if (calcEnd < 0)
             return;
@@ -1284,70 +1198,6 @@ Resolve.prototype = {
             } else
                 timerID++;
         }
-
-        /*
-         <tr class="local  task harvest">
-         <td class="warning"></td>
-
-         <td class="time">
-         <table class="task_timer_table">
-         <tbody><tr class="friendly">
-         <td>
-         <div class="task_timer" title="">
-         <div class="additional_content">
-         </div>
-         <div class="label">
-         <span class="text">         </span>
-         <span class="name">        </span>
-         </div>
-         <div id="31638370" class="js_timer">
-         <div id="31638370_bar" class="bar">
-         <div id="31638370_progress" class="progress" style="width: 11%;"></div>
-         <div id="31638370_timer_text" class="timer_text">
-         <span id="31638370_percent" class="percent">11%</span>
-         <span class="percent">(</span><span id="31638370_countdown" class="countdown">00:01:38</span><span class="percent">)</span>
-         </div>
-         </div>
-         </div>
-         <div class="below_content">
-         </div>
-         <script type="text/javascript">
-         makeTimer('31638370', 2, 110, null, true);
-         </script>
-         </div>
-         </td>
-         <td class="quantity">
-         </td>
-         </tr>
-         </tbody></table>
-         </td>
-
-         <td class="mission_type">
-         <a href="#" title="0 ore, 0 crystal, and 0 hydrogen. ">Harvest</a>
-         </td>
-
-         <td class="origin current"> //TODO: be sure my galaxy/show matches...
-         Chonkston <a href="/galaxy/show?current_planet=34397&amp;galaxy=1&amp;solar_system=346">&lrm;[1:346:4]</a>
-         </td>
-
-         <td class="destination">
-         Debris Field <a href="/galaxy/show?current_planet=34397&amp;galaxy=1&amp;solar_system=346">&lrm;[1:346:4]</a>
-         </td>
-
-         <td class="fleet">
-         <div class="ship">
-         <img alt="Icon_zagreus_class" src="/images/starfleet/ship_templates/icon_zagreus_class.png?1439250916" title="Zagreus Class Recycler">x1
-         </div>
-         <div class="clear"></div>
-         </td>
-
-         <td class="actions">
-         <a href="/harvest/cancel/31638370?current_planet=34397">Recall</a>
-         </td>
-
-
-         </tr>
-         */
 
         var t = "<tr class='local  task transport alt'>";
         t += "  <td class='warning'></td>";
@@ -1449,13 +1299,13 @@ Resolve.prototype = {
                 //var thisTypeCol = $(this).children('td').eq(0).html().trim();
                 //console.log("FLEET TYPE:", thisTypeCol.length, thisTypeCol);
 
-                thisTimerCol = $(this).children('td').eq(1).html();
+                var thisTimerCol = $(this).children('td').eq(1).html();
                 if (typeof thisTimerCol != 'undefined') {
                     //console.log("TIMER COL: " + thisTimerCol);
                     var timerData = String(thisTimerCol.match(timerRegEx));
                     //console.log("TIMER DATA: " + timerData);
-                    fleetStart = parseInt(timerData.split(',')[1], 10);
-                    fleetEnd = parseInt(timerData.split(',')[2], 10);
+                    var fleetStart = parseInt(timerData.split(',')[1], 10);
+                    var fleetEnd = parseInt(timerData.split(',')[2], 10);
                     //console.log('DEBUG: event start', fleetStart, 'end', fleetEnd);
                     // insert the event, note we did so, and break out of the rows loop
                     if (fleetEnd > calcEnd) {
@@ -1543,7 +1393,7 @@ jQuery(document).ready(function ($) {
     // Not on fleets or state=off (so nothing being saved), and not primordial...
     // TODO: code the "oh you forgot" logic for state=off...
     if (!primordial && (!onFleets)) {
-    //if (!primordial && (!onFleets || localStorage[window.location.href.split('.')[0].split('/')[2] + '-botState'] == "off")) {
+        //if (!primordial && (!onFleets || localStorage[window.location.href.split('.')[0].split('/')[2] + '-botState'] == "off")) {
         var bar = $('img[alt="Top_bar_starfleet"]');
         bar.hide();
 
@@ -1551,7 +1401,7 @@ jQuery(document).ready(function ($) {
         fuse.setAttribute('class', 'fuseTimer');
         var fuseBar = '';
         var fuseLen = 21;
-        for (j = 0; j < fuseLen; j++) {
+        for (var j = 0; j < fuseLen; j++) {
             fuseBar += '-------';
         }
         fuse.innerHTML = '<div id="timerFuse" style="color:deepskyblue;clear:left;">' + fuseBar + '<div>';
@@ -1564,7 +1414,7 @@ jQuery(document).ready(function ($) {
         fuseLen--;
         if (fuseLen > 0) {
             fuseBar = '-';
-            for (j = 0; j < fuseLen; j++) {
+            for (var j = 0; j < fuseLen; j++) {
                 fuseBar += '-------';
             }
 
