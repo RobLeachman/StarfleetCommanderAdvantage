@@ -861,7 +861,7 @@ Resolve.prototype = {
                 console.log("The bot is watching for your imminent, delayed return to the game...");
             } else if (decode[0] === 'sunset') {
                 var bedtime = new Date();
-                bedtime.setHours(22,00,0,0); // the day ends at 10:00PM, or 22:00
+                bedtime.setHours(23,15,0,0); // the day ends at 10:00PM, or 22:00
 
                 myTime = this.clockNow;
                 myStart = 0;
@@ -875,7 +875,7 @@ Resolve.prototype = {
             } else if (decode[0] === 'sunrise') {
                 var tomorrowSunrise = new Date();
                 tomorrowSunrise.setDate(tomorrowSunrise.getDate()+1);
-                tomorrowSunrise.setHours(8,30,0,0); // the day starts at 8:30AM
+                tomorrowSunrise.setHours(5,00,0,0); // the sunrise (next day) timer fires at 5:00AM, is fine
 
                 myTime = this.clockNow;
                 myStart = 0;
@@ -994,45 +994,7 @@ Resolve.prototype = {
                 missionInfo = "Galaxy View";
                 missionDest = "\n\n<span class='targetedLinkage'><a href='/galaxy/show?current_planet=" + this.nextPlanet + "&galaxy=" + viewGal + "&solar_system=" + viewSys + "'>[" + viewTarget + "]</a></span>";
             }
-        }
-        else if (decode.length == 3) {
-            // TODO: much the same as above, create function?
-            var threeParms = adhoc.split(',');
-            adhoc = threeParms[0]; // the time
-            newTime = this.getAdHocTime(adhoc);
-
-            myTime = this.clockNow;
-            myStart = 0;
-            myEnd = newTime;
-
-            viewTarget = threeParms[1];
-            var additional = threeParms[2];
-            if (viewTarget === 'tomorrow') {
-                logger.log('d', 'set new tomorrow and the one after that too!');
-                // 1:00,tomorrow,sunset=5:00;tomorrow=6:00
-                var splitNext = additional.split(';');
-                var nextSunset = splitNext[0];
-                var nextTomorrow = splitNext[1];
-                logger.log('d', 'next sunset=' + nextSunset + ' next tomorrow=' + nextTomorrow);
-
-                var sunset = nextSunset.split('=')[1];
-
-                this.addTimerEvent($, nextSunset.split('=')[1] + ',sunset');
-
-                callback = "function() { window.location = '/fleet?current_planet=" + this.nextPlanet + "'; }";
-                missionType = "Tomorrow";
-                missionInfo = "Tomorrow is coming";
-                missionDest = "See into the future";
-                console.log("The day after tomorrow...");
-
-
-            } else {
-                logger.log('e', "Don't know what to do with " + adhoc);
-                return;
-            }
-        }
-
-        else {
+        } else {
             console.log("TOO MANY!");
             return;
             /******************
@@ -1588,7 +1550,7 @@ jQuery(document).ready(function ($) {
         var fuse = document.createElement("div");
         fuse.setAttribute('class', 'fuseTimer');
         var fuseBar = '';
-        var fuseLen = 2;
+        var fuseLen = 21;
         for (j = 0; j < fuseLen; j++) {
             fuseBar += '-------';
         }
