@@ -284,6 +284,19 @@ function doToggleFleets() {
     document.cookie = 'set_toggleFleets=' + toggleFleets + ';path=/';
 }
 
+/**
+ * Called from Fleet screen, gets the counts for fleets out and total available.
+ *
+ * @param $         jQuery
+ * @returns {*[]}   counts
+ */
+function getFleetCounts($) {
+    var theirFleets = $('#fleets_used').html();
+    var fleetsOut = theirFleets.split('>')[1].split('<')[0];
+    var totalFleets = theirFleets.split('>')[2].split(' ')[0].split('/')[1];
+    return [parseInt(fleetsOut,10), parseInt(totalFleets,10)];
+}
+
 
 // Fix up a nicer fleet count, with a button to toggle the whole section...
 function addMyFleetbar($) {
@@ -291,15 +304,9 @@ function addMyFleetbar($) {
     if ($('#fleets_span').length) {
         var toolbarDiv = document.createElement('div');
         toolbarDiv.setAttribute('id', 'myFleets');
-        var theirFleets = $('#fleets_used').html();
-        //console.log('their fleets',theirFleets);
-        var fleetsOut = theirFleets.split('>')[1].split('<')[0];
-        //console.log("their fleet out:",fleetsOut);
-        var totalFleets = theirFleets.split('>')[2].split(' ')[0].split('/')[1];
-        //console.log('tot fleets',totalFleets);
-        var fleetCounts = 'Fleets: ' + fleetsOut + '/' + totalFleets;
 
-        var theHTML = '<span>' + fleetCounts + '</span><span style="float:right">';
+        var fleetCounts = getFleetCounts($);
+        var theHTML = '<span>' + 'Fleets: ' + fleetCounts[0] + '/' + fleetCounts[1] + '</span><span style="float:right">';
         theHTML += '<a id="myFleets" href="#">[Toggle]</a></span>';
         toolbarDiv.innerHTML = theHTML;
         $('#fleets_span').before(toolbarDiv);
@@ -308,23 +315,6 @@ function addMyFleetbar($) {
         setup.addEventListener('click', function (e) {
             doToggleFleets();
         }, false);
-
-        /*
-
-         // No idea why a second button needs to be in it's own div but that's the way it seemed tonight! //TODO:???
-         var toolbarDiv2 = document.createElement('div');
-         toolbarDiv2.setAttribute('id','myFleets');
-         //var theHTML2 = '<span><a id="myTimerButton" href="#">[TRY]</a></span>';
-         var theHTML2 = '<span><a id="myTimerButton" href="#">[TRY]</a></span>';
-         toolbarDiv2.innerHTML=theHTML2;
-         $('#fleets_span').before(toolbarDiv2);
-
-         $('#myTimerButton').click(function() {
-         doTryTimer($);
-         });
-
-         */
-
     }
 }
 
@@ -618,46 +608,70 @@ function doBuildAndSleep($) {
 
 
 /**
- *  Get the number of Carmanor freight ships, return true if sufficient else... we'll want to build some more
+ *  If Hercules cargo ships are down, calculate total capacity of Hercules + Carmanor and determine if more are needed.
+ *
+ *  The original paradigm was simple: in a greatly-evolved universe, simply check the capacity of the Carmanor Class
+ *  and if less than 85%, build a bunch more. Resources are produced at a prodigious rate, build times are long for
+ *  planetary upgrades, everything is easy.
+ *
+ *  For a developing universe this won't work, because Carmanor is an advanced technology.
+ *
+ *  The new plan is simple enough as well: Hercules Class Cargo are the basis of every FRS fleet, not Carmanor. FRS is
+ *  noted by the presence of at least one Hercules and capacity is the total of both Herc and Carm. If capacity is
+ *  insufficient we will build Carmanor if available, else Hercules.
  *
  *  updateScreen: display calculated result (so the "enough" test can be called multiple times, all logic on one place)
  **/
-function enoughCarms($, updateScreen) {
+function enoughCargo($, updateScreen) {
     var logger = new Logger();
 
-    var carmanors = 0;
+    var hercCap, carmCap;
+
+    var fleetListHTML = $('.fleet_table> .fleet').html();
+    if (typeof fleetListHTML === "string") {
+        hercCap = getCargoCapacity($, "Hercules Class Cargo");
+
+        if (hercCap > 0) {
+            carmCap = getCargoCapacity($, "Carmanor Class Cargo");
+            var tot = parseInt($("#max_ore").val(), 10) + parseInt($("#max_crystal").val(), 10) + parseInt($("#max_hydrogen").val(), 10);
+            var loaded = (tot / (hercCap + carmCap) * 100).toFixed(0);
+            if (updateScreen) {
+                //logger.log('d','Cargo load='+loaded);
+                var fleetListOut = fleetListHTML.replace(/Hercules Class Cargo/g, "Hercules Class Cargo (" + loaded + "% loaded)");
+                $('.fleet_table > .fleet').html(fleetListOut);
+            }
+            return (loaded < 85);
+
+        } else {
+            // no hercules
+            return true;
+        }
+    } else {
+        // no fleet at all
+        return true;
+    }
+}
+
+function getCargoCapacity($, shipType) {
+    var logger = new Logger();
+
+    var count = 0;
+    var shipTypeNoSpaces = shipType.replace(/\s/g, "");
     var fleetListHTML = $('.fleet_table> .fleet').html();
     if (typeof fleetListHTML === "string") {
         var fleetList = fleetListHTML.replace(/\s/g, "");
-        var carms = fleetList.match(/CarmanorClassCargo.*/);
+        var re = new RegExp(shipTypeNoSpaces + '.*');
+        var thatShip = fleetList.match(re);
 
-        if (carms instanceof Array) {
-
-            ////** THIS IS IT ... select one of the indicated ship (for Gaia)
-            //var shipID = fleetList.match(/HermesClassProbe.*/)[0].split('_')[2];
-            //incrementWidget('ship_quantity_' + shipID, 1, 0, null);
-            //console.log("CARMS HTML:",fleetList.match(/HermesClassProbe.*/)[0].split('_')[2]);
-
-            carmanors = parseInt(fleetList.match(/CarmanorClassCargo.*/)[0].split('<')[6].split('>')[1], 10);
+        if (thatShip instanceof Array) {
+            var shipID = fleetList.match(re)[0].split('_')[2];
+            count = parseInt($('#ship_quantity_' + shipID + '_max').html(), 10);
+            var cap = parseInt($('#ship_quantity_' + shipID + '_cargo_capacity').html(), 10);
+            return count * cap;
         } else {
-            console.log("no carms");
+            //console.log("no ships named", shipType);
+            return 0;
         }
-    }
-    if (carmanors > 0) {
-        var available = carmanors * 125000;
-        var tot = parseInt($("#max_ore").val(), 10) + parseInt($("#max_crystal").val(), 10) + parseInt($("#max_hydrogen").val(), 10);
-        //var loaded = (tot/available*100).toFixed(2);
-        var loaded = (tot / available * 100).toFixed(0);
-        if (updateScreen) {
-            //logger.log('d','Cargo load='+loaded);
-            var fleetListOut = fleetListHTML.replace(/Carmanor Class Cargo/g, "Carmanor Class Cargo (" + loaded + "% loaded)");
-            $('.fleet_table > .fleet').html(fleetListOut);
-        }
-
-        return (loaded < 85);
-    } else {
-        // if no carms the fleet must be out, so don't build more just now //TODO: how do we get the very first one?!
-        return true;
     }
 }
 
@@ -687,61 +701,105 @@ function haveGaia($) {
     }
 }
 
+/**
+ * Get the speed of the recycler, determines duration of sleepsave
+ */
+function checkFleetSpeed($, universe) {
+    var fleetListHTML = $('.fleet_table> .fleet').html();
+    if (typeof fleetListHTML === "string") {
+        var fleetList = fleetListHTML.replace(/\s/g, "");
+        var findGaia = fleetList.match(/DionysusClassRecycler.*/);
+        if (findGaia instanceof Array) {
 
-// Incomplete, and now I'm not even sure what I was thinking...
-function calculateDurationFromInterval($, interval) {
+            var shipID = fleetList.match(/DionysusClassRecycler.*/)[0].split('_')[2];
+            //console.log("found a recycler with ID ", shipID);
+            var speedField = $('#ship_quantity_' + shipID + '_speed');
+            //console.log("speed=", parseInt(speedField.html(),10));
+            localStorage[universe + '-fleetSpeed'] = parseInt(speedField.html(), 10);
+        }
+    }
+}
+
+
+/**
+ * Use the interval to determine sleep distance and speed...
+ *
+ * For the moment, only interval 99 works -- if set, find the best pick to match seconds-until-tomorrow... or something
+ *
+ * @param $            - jQuery, unused...
+ * @param interval     - ill-defined "interval"
+ * @returns {number[]} - an array with [0] = distance and [1] = speed
+ */
+function calculateDurationFromInterval($, universe, interval) {
     var logger = new Logger();
     logger.log('d', 'Calculating duration for interval ' + interval);
 
     logger.log('d', 'Sleep interval=' + interval);
-    targetDist = 0;
-    sleepSpeed = 10 - parseInt(interval, 10);
-    if (sleepSpeed > 9) {
-        logger.log('d', 'Tomorrow, always tomorrow');
-        var sleepPicks = generateSleepPicks();
+    //sleepSpeed = 10 - parseInt(interval, 10);
+    var theInterval = parseInt(interval, 10);
+    if (theInterval > 9) {
+        logger.log('d', 'Tomorrow is always a day away...');
+        var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
+        logger.log('d', 'Target secs=' + tomorrowSecs);
+        if (typeof tomorrowSecs === 'undefined') {
+            logger.log('w', 'There is no tomorrow');
+        } else {
 
-        var morningPick = 0;
-        for (var k = 0; k < sleepPicks.length; k++) {
-            morningPick = sleepPicks[k];
-            console.log("TOMORROW ", sleepPicks[k], sleepPicks[k].split(':')[0]);
-            if (sleepPicks[k].split(':')[0] == 4) {
-                break;
+            var sleepPicks = generateSleepPicks(universe);
+
+            var morningPick = 0;
+            for (var k = 0; k < sleepPicks.length; k++) {
+                morningPick = sleepPicks[k];
+                var sleepSecs = parseInt(morningPick.split("/")[1].split("~")[0], 10);
+                console.log("TOMORROW ", sleepPicks[k], sleepSecs);
+
+                if (sleepSecs > tomorrowSecs) {
+                    break;
+                }
             }
+            logger.log('d', 'Tomorrow return=' + morningPick);
+
+
+            var opts = morningPick.split("~")[1];
+            console.log("  opts=" + opts);
+            var speedOpt = opts.split(";")[0];
+
+            // I'm tired and need to sleep, rather the point of this exercise... so here's some shit:
+
+            //sleepSpeed = 10 - speedOpt //TODO or something, fix this shitty code
+
+            if (speedOpt == 10) sleepSpeed = 0;
+            if (speedOpt == 9) sleepSpeed = 1;
+            if (speedOpt == 8) sleepSpeed = 2;
+            if (speedOpt == 7) sleepSpeed = 3;
+            if (speedOpt == 6) sleepSpeed = 4;
+            if (speedOpt == 5) sleepSpeed = 5;
+            if (speedOpt == 4) sleepSpeed = 6;
+            if (speedOpt == 3) sleepSpeed = 7;
+            if (speedOpt == 2) sleepSpeed = 8;
+            if (speedOpt == 1) sleepSpeed = 9;
+
+            var distOpt = opts.split(";")[1].split("(")[0];
+            //console.log("PICK TIME: speedOpt=" + speedOpt + " sleepSpeed=" + sleepSpeed + " dist=" + distOpt);
+
+            targetDist = distOpt;
         }
-        logger.log('d', 'Tomorrow return=' + morningPick);
 
+    } else {
 
-        var opts = morningPick.split("~")[1];
-        console.log("  opts=" + opts);
-        var speedOpt = opts.split(";")[0];
+        // TODO: Right here is about where this "interval" notion ends... either it's > 9 (like 99=tomorrow) and we
+        // do the above... or IDK what to do, except use the old config values??
 
-        // I'm tired and need to sleep, rather the point of this exercise... so here's some shit:
-        var sleepSpeed;
-        if (speedOpt == 10) sleepSpeed = 0;
-        if (speedOpt == 9) sleepSpeed = 1;
-        if (speedOpt == 8) sleepSpeed = 2;
-        if (speedOpt == 7) sleepSpeed = 3;
-        if (speedOpt == 6) sleepSpeed = 4;
-        if (speedOpt == 5) sleepSpeed = 5;
-        if (speedOpt == 4) sleepSpeed = 6;
-        if (speedOpt == 3) sleepSpeed = 7;
-        if (speedOpt == 2) sleepSpeed = 8;
-        if (speedOpt == 1) sleepSpeed = 9;
-
-        var distOpt = opts.split(";")[1].split("(")[0];
-        //console.log("PICK TIME: speedOpt=" + speedOpt + " sleepSpeed=" + sleepSpeed + " dist=" + distOpt);
-        console.log("Selected speed=" + sleepSpeed + " dist=" + distOpt);
-
-
-        targetDist = distOpt;
-
+        // Distance: negative is # of planets away, positive is # of systems away, 0 is the home planet
+        var targetDist = myGMgetValue('SleepDist', 1);
+        // Speed: 0=100% 9=10%
+        var sleepSpeed = myGMgetValue("SleepSpeed", 1);
     }
 
-
     // would use object variables except this isn't an object
-    var result = [7, 9];
-    return result;
-
+//    var result = [targetDist, sleepSpeed];
+//    return result;
+    return [targetDist, sleepSpeed];
 }
 
 
@@ -772,7 +830,7 @@ function initSleepsave($, manual) {
     //console.log("DEBUG: sleep options dist", targetDist, "speed", sleepSpeed);
 
     if (manual) {
-        var sleepPicks = generateSleepPicks();
+        var sleepPicks = generateSleepPicks(universe);
 
         // Dupe code, but options screen is dumb so this is good //TODO: kill options, or fix dupe...
         var myHTML = 'Return time:&nbsp;';
@@ -823,7 +881,7 @@ function initSleepsave($, manual) {
         //console.log("SKIP Builder...");localStorage[universe + '-goalieCounter'] = 'debugger-skip builder';
 
         // Be sure we have enough cargo
-        var enough = enoughCarms($, false);
+        var enough = enoughCargo($, false);
 
         var nextScreen = "";
 
@@ -927,80 +985,37 @@ function doAutoSleep($, thePlanet, targetDist, sleepSpeed) {
 
 
     var interval = localStorage[universe + '-fleetInterval'];
-    if (typeof interval === 'undefined') {
+    if (typeof interval == 'undefined') {
         logger.log('w', 'WARN: no interval, must punt');
     } else {
+        logger.log('d', 'Sleep interval=' + interval);
         // As soon as it's ready, use this function:
 
-        // var result = calculateDurationFromInterval($,interval);
+        var result = calculateDurationFromInterval($, universe, interval);
 
-        // sleepSpeed = result[0];
-        // targetDist = result[1];
-        // logger.log('d',"DEBUG calculated speed="+sleepSpeed+" distance="+targetDist);
-
-        // <INSTEAD OF this:>
-
-        logger.log('d', 'Sleep interval=' + interval);
-        //sleepSpeed = 10 - parseInt(interval, 10);
-        var theInterval = parseInt(interval, 10);
-        if (theInterval > 9) {
-            logger.log('d', 'Tomorrow, always tomorrow');
-            var tomorrowSecs = localStorage[universe + '-secondsUntilTomorrow'];
-            logger.log('d', 'Target secs=' + tomorrowSecs);
-            if (typeof tomorrowSecs === 'undefined') {
-                logger.log('w', 'There is no tomorrow');
-            } else {
-
-                var sleepPicks = generateSleepPicks();
-
-                var morningPick = 0;
-                for (var k = 0; k < sleepPicks.length; k++) {
-                    morningPick = sleepPicks[k];
-                    var sleepSecs = parseInt(morningPick.split("/")[1].split("~")[0], 10);
-                    console.log("TOMORROW ", sleepPicks[k], sleepSecs);
-
-                    if (sleepSecs > tomorrowSecs) {
-                        break;
-                    }
-                }
-                logger.log('d', 'Tomorrow return=' + morningPick);
-
-
-                var opts = morningPick.split("~")[1];
-                console.log("  opts=" + opts);
-                var speedOpt = opts.split(";")[0];
-
-                // I'm tired and need to sleep, rather the point of this exercise... so here's some shit:
-
-                //sleepSpeed = 10 - speedOpt //TODO or something, fix this shitty code
-
-                if (speedOpt == 10) sleepSpeed = 0;
-                if (speedOpt == 9) sleepSpeed = 1;
-                if (speedOpt == 8) sleepSpeed = 2;
-                if (speedOpt == 7) sleepSpeed = 3;
-                if (speedOpt == 6) sleepSpeed = 4;
-                if (speedOpt == 5) sleepSpeed = 5;
-                if (speedOpt == 4) sleepSpeed = 6;
-                if (speedOpt == 3) sleepSpeed = 7;
-                if (speedOpt == 2) sleepSpeed = 8;
-                if (speedOpt == 1) sleepSpeed = 9;
-
-                var distOpt = opts.split(";")[1].split("(")[0];
-                //console.log("PICK TIME: speedOpt=" + speedOpt + " sleepSpeed=" + sleepSpeed + " dist=" + distOpt);
-
-                targetDist = distOpt;
-            }
-
-        }
-        // </INSTEAD>
+        targetDist = result[0];
+        sleepSpeed = result[1];
+        logger.log('d', "DEBUG calculated speed=" + sleepSpeed + " distance=" + targetDist);
     }
 
-    logger.log('d', 'Sleepsave fires, speed=' + sleepSpeed + ' dist=' + targetDist);
+    var fleetCounts = getFleetCounts($);
 
-    //console.log("DEBUG SKIP SLEEP");
-    //return;
+    //TODO: Must figure out why I can't just skip when no fleet is available...
+    //    if (fleetCounts[0] < fleetCounts[1]) {
+    if (1 == 1) {
 
-    do_sleepsave(targetDist, sleepSpeed, false);
+
+
+        logger.log('d', 'Sleepsave fires, speed=' + sleepSpeed + ' dist=' + targetDist);
+        do_sleepsave(targetDist, sleepSpeed, false);
+    } else {
+        logger.log('w', 'Could not save, all fleets out! ' + fleetCounts[0] + '/' + fleetCounts[1]);
+        window.location.href = "/fleet?current_planet=" + thePlanet;
+    }
+
+    //logger.log('d', 'Sleepsave fires, speed=' + sleepSpeed + ' dist=' + targetDist);
+    //do_sleepsave(targetDist, sleepSpeed, false);
+
 }
 
 // this is injected into the page, it's NOT userscript!
@@ -1324,7 +1339,7 @@ function my_calc_distance(p, ss, g, tar_p, tar_ss, tar_g) {
 /**
  * Coded in 2010 and with sparse comments
  */
-function generateSleepPicks() {
+function generateSleepPicks(universe) {
 
     //2015 analysis begins with seeing the date came in as a closure... was it UTC or local?
     var myDate = new Date();
@@ -1335,7 +1350,14 @@ function generateSleepPicks() {
     //var myMinutes = myDate.getMinutes();
     //var mySeconds = myDate.getSeconds();
 
-    var dionysusSpeed = 4800;
+    var dionysusSpeed = 340;
+    if (typeof localStorage[universe + '-fleetSpeed'] != "undefined") {
+        dionysusSpeed = localStorage[universe + '-fleetSpeed'];
+
+    } else {
+        var logger = new Logger();
+        logger.log('e', 'Fleet speed not calculated, using default Zeus 340!');
+    }
 
     // Determine all (good?) travel distances
     var sleepPicks = [];
@@ -1346,7 +1368,7 @@ function generateSleepPicks() {
     // the times to other systems?
     for (speed = 1; speed < 11; speed++) {
         //for (dist = 1; dist < 25; dist++) {
-        for (dist = 1; dist < 40; dist++) {
+        for (dist = 1; dist < 50; dist++) {
             distCalc = my_calc_distance(1, 1, 1, 1, dist + 1, 1);
             duration = Math.ceil((35000.0 / speed) * Math.sqrt((distCalc * 10) / dionysusSpeed) + 10); // seconds to target
 
@@ -1484,8 +1506,8 @@ function generateSleepPicks() {
 }
 
 
-function getOptionsHTML() {
-    var sleepPicks = generateSleepPicks();
+function getOptionsHTML(universe) {
+    var sleepPicks = generateSleepPicks(universe);
 
     /*
      var activePlayerAlert = myGMgetValue('AlertActive', false);
@@ -1845,7 +1867,7 @@ function addOptionsButtonListeners($) {
 }
 
 
-function doOptionsPage($) {
+function doOptionsPage($, universe) {
     var myDate = new Date();
     var myHours = myDate.getUTCHours();
     var myMinutes = myDate.getUTCMinutes();
@@ -1880,7 +1902,7 @@ function doOptionsPage($) {
 	}
      **/
 
-    var prefsBox = getOptionsHTML();
+    var prefsBox = getOptionsHTML(universe);
     var planet_order = document.getElementById('default_esp');           // where was this before?
     planet_order.parentNode.insertBefore(prefsBox, planet_order);
 
@@ -1921,9 +1943,9 @@ function toolbarAutoSleep($, offerSleepSetup) {
             var universe = window.location.href.split('.')[0].split('/')[2];  //TODO: when this is an object, all will be well and less of a hack?
             var interval = localStorage[universe + '-fleetInterval'];
 
-            var result = calculateDurationFromInterval($, interval);
+            var result = calculateDurationFromInterval($, universe, interval);
             var logger = new Logger();
-            logger.log('d', "DEBUG calc speed=" + result[0] + " distance=" + result[1]);
+            logger.log('d', "DEBUG calc distance=" + result[0] + " speed=" + result[1]);
         });
 
     } else {
@@ -1996,7 +2018,7 @@ function buildRequestExecuted($, triggerElement) {
         var cost = $('#speedup_' + freeSpeedup + '_cost').html();
         if (cost == "FREE") {
             new Ajax.Request('/store/confirm_speedup/' + freeSpeedup + '?current_planet=' + thePlanet +
-                    '&amp;ref_action=build&amp;ref_controller=home',
+                '&amp;ref_action=build&amp;ref_controller=home',
                 {
                     asynchronous: true,
                     evalScripts: true,
@@ -2121,8 +2143,10 @@ jQuery(document).ready(function ($) {
     if ($('#content.fleet.index').length) {
 
         // Display cargo load percentage
-        enoughCarms($, true);
-        haveGaia($);
+        enoughCargo($, true);
+
+        checkFleetSpeed($, universe);
+        //haveGaia($);
 
         // Wrap the table in a div for easier hide                                       //TODO:Do we really need this?
         $("#tasks").wrap("<div id='fleetWrapper' style='display:" + toggleFleetDisplay + "'></div>");
@@ -2288,7 +2312,7 @@ jQuery(document).ready(function ($) {
     // Display BOJ message with version on Profile screen
     if ($('#content.options.index').length) {
         insertProfileHeader($, moduleEnabled);
-        doOptionsPage($);
+        doOptionsPage($, universe);
     }
 });
 
