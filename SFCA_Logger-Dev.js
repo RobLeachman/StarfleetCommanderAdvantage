@@ -259,9 +259,6 @@ function Location(e) {
         var searchNumber = buildingNumber.exec(buttonHTML);
         this.buildingNumber = searchNumber[2];
 
-        //TODO: get cracking on the builder
-        // class=" ajax link" contains enabled and disabled, the one that's not hidden is the can/can't be built clue...
-
         // flag the buildings that can't be built
         var enabledButton = /(enabled)(.*?)(>)/;
         var searchEnabled = enabledButton.exec(buttonHTML);
@@ -400,6 +397,13 @@ Goalie.prototype = {
         if (recommendedBuild === "Solar Array" && !this.primordial) {
             console.log("Burn the gas");
             recommendedBuild = "Nuclear Power Plant";
+        }
+
+        // Wacky universe, we can get this stuff from harvesting...
+        if (this.primordial) {
+            if (recommendedBuild == "Ore Mine" || recommendedBuild == "Crystal Mine") {
+                recommendedBuild = "Hydrogen Synthesizer";
+            }
         }
 
         localStorage[this.universe + '-' + 'tech_' + this.planet] = recommendedBuild;
