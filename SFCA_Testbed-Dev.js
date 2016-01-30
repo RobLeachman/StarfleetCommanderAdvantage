@@ -393,14 +393,6 @@ function confirmIfFree($, popup) {
         var stupidConfirm = $('#confirm_popup');
         stupidConfirm.hide();
 
-        var confirm = $(".confirm_button");
-        console.log("sel len " + confirm.length);
-        var theButton = $('.confirm_button').first();
-
-        // I considered working the HTML as strings, ugh...
-        //var popupHTML = popup.html();
-        //console.log("HTML: " + popupHTML);
-
         // Just find the form and submit it
         /***
          * DEV NOTE:
@@ -418,6 +410,7 @@ function confirmIfFree($, popup) {
 function displayingResources($, fields) {
     //doResearchReport($);
     toolbarResources($);
+    findCrummyPlants($);
 
     var comments = new Array('First', 'Second', 'Third');
 
@@ -527,6 +520,39 @@ function stripCoordsFromPlanetRow($, row) {
     var coords = planet.children('div').first().next().find('.coords');
     var theirHTML = coords.html();
     return theirHTML.split('=')[2].split('&')[0]; // for /fleet?current_planet=34287
+}
+
+function stripNameFromPlanetRow($, row) {
+    var planet = row.children('td').first();
+    var name = planet.children('div').first().next().find('.name');
+    return name.html();
+    //var theirHTML = coords.html();
+    //return theirHTML.split('=')[2].split('&')[0]; // for /fleet?current_planet=34287
+
+}
+
+function findCrummyPlants($) {
+    var i = -1;
+    $('#overview_table > table > tbody  > tr').each(function () {
+        if (i > -1) {
+            $this = $(this);
+            var theirRow = 'theirRow' + i;
+            this.setAttribute('id', theirRow);
+            //console.log('DEBUG",$this.children('td').first().html());
+            if ($this.children('td').first().html() !== 'TOTAL:') {
+                var p = stripCoordsFromPlanetRow($, $this);
+                var name = stripNameFromPlanetRow($, $this);
+                var fields = $this.children('td').last().html().split('f')[1];
+
+                if (parseInt(fields, 10) < 220 && name === "Colony") {
+                    console.log(p, "is shite");
+                }
+
+            }
+        }
+        i++;
+    });
+
 }
 
 function doResearchReport($) {
@@ -746,6 +772,22 @@ Shipwright.prototype = {
         }
         return false;
     },
+    hasDryDock: function ($, shipType) {
+        var logger = new Logger(this.universe);
+        //logger.log('d', 'Checking for build capability, type=' + shipType);
+        var foundShip = false;
+        $('.row.ship_template').each(function () {
+            $this = $(this);
+            var id = $this.attr('id').split('_')[1];
+            //var name = $(this).closest('name');
+            var name = $(this).children().first().next().html().split('>')[2].split('<')[0];
+            if (name === shipType) {
+                foundShip = true;
+                return false;
+            }
+        });
+        return foundShip;
+    },
     buildShip: function ($, shipType, amount) {
         var logger = new Logger(this.universe);
         logger.log('d', 'requested build=' + shipType);
@@ -870,7 +912,7 @@ jQuery(document).ready(function ($) {
     if (activatePlanet.length)
         thePlanet = activatePlanet;
 
-    var uni = window.location.href.split('.')[0].split('/')[2];
+    var universe = window.location.href.split('.')[0].split('/')[2];
 
     //emitNotification("Some important message", true);
     //    addMyCSS();
@@ -919,24 +961,20 @@ jQuery(document).ready(function ($) {
         var wright = new Shipwright();
 
         if (wright.getBuildState() === 'carmanor') {
+
             if (!wright.builderQueued($)) {
                 logger.log('d', "Shipwright begins building cargo...");
-
-                //console.log("DEBUG: building probes not carms...");
-                //wright.buildShip($, 'Hermes Class Probe', 1); // for debugging, build something quick...
-                wright.buildShip($, 'Carmanor Class Cargo', 30);
-
+                if (wright.hasDryDock($, 'Carmanor Class Cargo')) {
+                    wright.buildShip($, 'Carmanor Class Cargo', 8); // another 2M
+                } else if (wright.hasDryDock($, 'Hercules Class Cargo')) {
+                    wright.buildShip($, 'Hercules Class Cargo', 4); // another 100K
+                } else {
+                    logger.log('e', 'Cannot build any cargo!');
+                }
             } else {
                 logger.log('d', "Already building...");
                 wright.buildError($, null, true);
             }
-
-
-        } else {
-            //wright.buildShip($, 'Athena Class Battleship', 1);
-            //wright.buildShip($, 'Hermes Class Probe', 1);
-
-            //console.log("FORCE BUILD"); wright.buildShip($, 'Carmanor Class Cargo', 30);
         }
     }
 
@@ -951,9 +989,9 @@ jQuery(document).ready(function ($) {
         $('.row.location').each(function () {
             var loc = new Location($(this));
             if (loc.isNamed('Research Lab')) {
-                localStorage[uni + '-' + 'research_' + thePlanet] = loc.level;
+                localStorage[universe + '-' + 'research_' + thePlanet] = loc.level;
                 //console.log("RESEARCH LEVEL:",loc.level);
-                localStorage[uni + '-' + 'researchUpgrade_' + thePlanet] = loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
+                localStorage[universe + '-' + 'researchUpgrade_' + thePlanet] = loc.oCost + '/' + loc.cCost + '/' + loc.hCost;
                 var researchPosition = "#" + getResearchPosition(thePlanet);
 
                 // Display research level and relative position
@@ -981,16 +1019,29 @@ jQuery(document).ready(function ($) {
     // Doesn't work as well as I'd hoped, needs a "just do it" button
     if ($('.profile.index').length) {
         console.log("On home screen...");
+
         // Idle planets tagged as trash should go to the bin...
-        if ($('#planet_title').html() === "Trash" && $( "div:contains('Nothing is happening')").length) {
+        if ($('#planet_title').html() === "Trash" &&
+            $("div:contains('Nothing is happening')").length &&
+            (typeof localStorage[universe + '-growMode'] !== "undefined")) {
             console.log("Junk this thing");
             var coords = $('#planet_coords').html().split('[')[1].split(']')[0].replace(/:/g, ".");
             window.location.href = "/profile/abandon?current_planet=" + thePlanet +
                 "&amp;planet_coords=" + coords + "&amp;ref_action=index&amp;ref_controller=profile";
-
-
-
         }
+    }
+
+    if ($('.profile.abandon').length) {
+        console.log("On abandon screen...");
+        /*
+         // Idle planets tagged as trash should go to the bin...
+         if ($('#planet_title').html() === "Trash" && $( "div:contains('Nothing is happening')").length) {
+         console.log("Junk this thing");
+         var coords = $('#planet_coords').html().split('[')[1].split(']')[0].replace(/:/g, ".");
+         window.location.href = "/profile/abandon?current_planet=" + thePlanet +
+         "&amp;planet_coords=" + coords + "&amp;ref_action=index&amp;ref_controller=profile";
+         }
+         */
     }
 
 
@@ -1030,7 +1081,27 @@ jQuery(document).ready(function ($) {
         }
     }
 
-
+    // On the Galaxy screen...
+    if ($('.galaxy.show').length) {
+        // Provide a way to mark any debris fields as the Huge Derbis Field we'll harvest instead of arbitrary distances
+        $("tr.planet").each(function () {
+            $this = $(this);
+            var slot = $this.find('.slot').html();
+            if ($this.children('td').first().next().next().html().length > 10) { // blank may be a few spaces
+                var actionList = $this.find('.actions');
+                actionList.html(actionList.html() + '<span><a href ' +
+                    //'onClick="saveHugeDebrisFieldCoords();"' +
+                    'id="saveHugeDebrisField_' + slot + '"' +
+                    '>HDF</a></span>');
+                $('#saveHugeDebrisField_' + slot).click(function () {
+                    var universe = window.location.href.split('.')[0].split('/')[2];  //TODO: when this is an object, all will be well and less of a hack?
+                    galaxy = document.getElementById('galaxy').value;
+                    system = document.getElementById('solar_system').value;
+                    localStorage[universe + '-hugeDebrisField'] = galaxy+":"+system+":"+slot;
+                });
+            }
+        });
+    }
     // Display BOJ message on Profile screen
     if ($('#content.options.index').length) {
         insertProfileHeader($);
@@ -1096,7 +1167,13 @@ jQuery(document).ready(function ($) {
 //console.log("BOJ Testbed");
 addMyCSS_testbed();
 
-
+// Iterate all local storage...
+/*
+ for(key in localStorage) {
+ console.log("STORE KEY", key);
+ //delete localStorage[key];
+ }
+ */
 
 
 /* ADD A NOTE... need to iterate each row, and $this=$(this) doesn't translate well if using noConflict workaround with assigning a new variable name to replace the $ alias.
